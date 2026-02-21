@@ -1,1 +1,0 @@
-# نبض - Nabd AI Assistant
