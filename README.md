@@ -53,6 +53,23 @@ npm run check
 npm run dev
 ```
 
+## Vercel Deployment (Frontend + API)
+
+This repository builds two outputs:
+
+- `dist/public`: Vite frontend files (what Vercel should serve).
+- `dist/index.cjs`: Node server bundle for non-Vercel Node hosting.
+
+To avoid serving the Node bundle as the website root, Vercel is configured via `vercel.json` to:
+
+- run `npm run build`
+- publish `dist/public`
+- route `/api/*` to a Vercel Node function (`api/index.ts`) that reuses the Express routes.
+- fallback non-file frontend paths to `index.html` for SPA routing.
+
+After pulling these changes, redeploy the project in Vercel.  
+If you have Build & Output overrides set in the Vercel dashboard, disable them so `vercel.json` is respected.
+
 ### Debug Endpoints (development only)
 
 - `POST /api/ai/debug/plan` with `{ "content": "..." }`

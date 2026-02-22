@@ -1,13 +1,13 @@
-import { isModelConfigured, generateModelReply } from "./provider";
-import { buildExecutionPlan, type ExecutionPlan } from "./planner";
+import { isModelConfigured, generateModelReply } from "./provider.js";
+import { buildExecutionPlan, type ExecutionPlan } from "./planner.js";
 import {
   listToolDefinitions,
   runTool,
   type ToolExecutionOutput,
   type ToolName,
-} from "./tools";
-import { normalizeChatRole, type ChatMessage } from "./types";
-import { retrieveKnowledgeContext, type RetrievedContext } from "../rag/retriever";
+} from "./tools.js";
+import { normalizeChatRole, type ChatMessage } from "./types.js";
+import { retrieveKnowledgeContext, type RetrievedContext } from "../rag/retriever.js";
 
 interface ConversationTurn {
   role: string;

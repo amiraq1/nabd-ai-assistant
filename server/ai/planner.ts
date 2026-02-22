@@ -5,7 +5,7 @@ import {
   looksLikeWeatherIntent,
   looksLikeWebSearchIntent,
   type ToolName,
-} from "./tools";
+} from "./tools.js";
 
 export interface PlanStep {
   id: string;

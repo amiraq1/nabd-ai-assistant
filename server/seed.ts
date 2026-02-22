@@ -1,4 +1,4 @@
-import { storage } from "./storage";
+import { storage } from "./storage.js";
 
 export async function seed() {
   const existing = await storage.getConversations();

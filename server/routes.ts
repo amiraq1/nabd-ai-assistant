@@ -1,19 +1,19 @@
 import type { Express, RequestHandler } from "express";
 import type { Server } from "http";
-import { storage } from "./storage";
+import { storage } from "./storage.js";
 import {
   generateAssistantReply,
   previewOrchestration,
-} from "./ai/orchestrator";
+} from "./ai/orchestrator.js";
 import {
   getLatestTrace,
   getTraceHistory,
   recordTrace,
-} from "./ai/trace-store";
+} from "./ai/trace-store.js";
 import {
   listKnowledgeDocuments,
   upsertKnowledgeDocuments,
-} from "./rag/retriever";
+} from "./rag/retriever.js";
 
 export async function registerRoutes(
   httpServer: Server,

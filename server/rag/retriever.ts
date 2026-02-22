@@ -1,9 +1,9 @@
-import { KNOWLEDGE_DOCUMENTS } from "./knowledge";
+import { KNOWLEDGE_DOCUMENTS } from "./knowledge.js";
 import {
   InMemoryVectorStore,
   type VectorSearchResult,
   type VectorStoreDocument,
-} from "./vector-store";
+} from "./vector-store.js";
 
 export interface RetrievedContext {
   title: string;

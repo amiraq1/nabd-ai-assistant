@@ -1,4 +1,4 @@
-import type { OrchestrationTrace } from "./orchestrator";
+import type { OrchestrationTrace } from "./orchestrator.js";
 
 const MAX_HISTORY_PER_CONVERSATION = 30;
 const MAX_GLOBAL_HISTORY = 80;

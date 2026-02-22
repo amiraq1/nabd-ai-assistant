@@ -1,4 +1,4 @@
-import type { ChatMessage } from "./types";
+import type { ChatMessage } from "./types.js";
 
 const AI_ENDPOINT = process.env.AI_ENDPOINT ?? "https://integrate.api.nvidia.com/v1/chat/completions";
 const AI_MODEL = process.env.AI_MODEL ?? "meta/llama-3.1-70b-instruct";
