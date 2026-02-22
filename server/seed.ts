@@ -1,6 +1,5 @@
 import { db } from "./db";
 import { conversations, messages } from "@shared/schema";
-import { sql } from "drizzle-orm";
 
 export async function seed() {
   const existing = await db.select().from(conversations).limit(1);

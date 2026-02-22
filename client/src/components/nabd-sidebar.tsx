@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { MessageSquare, Plus, Settings, Trash2, X } from "lucide-react";
+import { MessageSquare, Plus, Settings, Trash2, UserRound, X } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import type { Conversation } from "@shared/schema";
+import { Link } from "wouter";
 
 interface NabdSidebarProps {
   conversations: Conversation[];
@@ -110,9 +111,20 @@ export function NabdSidebar({
         </ScrollArea>
 
         <div className="p-3 border-t border-white/5">
-          <div className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-white/30 cursor-pointer transition-colors hover:text-white/50 hover:bg-white/5">
-            <Settings className="w-4 h-4" />
-            <span className="text-sm">الإعدادات</span>
+          <div className="space-y-1">
+            <Link
+              href="/user"
+              onClick={onClose}
+              className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-white/40 transition-colors hover:text-white/70 hover:bg-white/5"
+              data-testid="link-user-page"
+            >
+              <UserRound className="w-4 h-4" />
+              <span className="text-sm">صفحة المستخدم</span>
+            </Link>
+            <div className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-white/30 cursor-default">
+              <Settings className="w-4 h-4" />
+              <span className="text-sm">الإعدادات</span>
+            </div>
           </div>
         </div>
       </aside>
