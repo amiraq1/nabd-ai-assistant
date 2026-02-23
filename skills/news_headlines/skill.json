@@ -1,0 +1,34 @@
+{
+  "id": "news_headlines",
+  "name": "الأخبار",
+  "description": "جلب عناوين أخبار حديثة حسب الموضوع.",
+  "category": "news",
+  "version": "1.0.0",
+  "handler": "news_headlines",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "topic": {
+        "type": "string",
+        "description": "موضوع الأخبار"
+      },
+      "language": {
+        "type": "string",
+        "description": "لغة الأخبار مثل ar أو en"
+      }
+    },
+    "required": [],
+    "additionalProperties": false
+  },
+  "planner": {
+    "keywords": ["أخبار", "خبر", "news", "headline", "عاجل"],
+    "patterns": ["(?:أخبار|خبر|عاجل)", "\\b(news|headline)\\b"],
+    "extractor": "news_topic",
+    "objective": "إحضار أحدث العناوين ذات الصلة بالموضوع.",
+    "priority": 22
+  },
+  "samplePrompts": [
+    "ما آخر أخبار الذكاء الاصطناعي؟",
+    "أعطني أهم الأخبار التقنية اليوم"
+  ]
+}

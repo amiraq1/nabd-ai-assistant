@@ -5,45 +5,129 @@ import { NabdSidebar } from "@/components/nabd-sidebar";
 import { NabdHeader } from "@/components/nabd-header";
 import { ChatInput } from "@/components/chat-input";
 import { ChatMessages } from "@/components/chat-messages";
+import { BentoGrid } from "@/components/bento-grid";
 import type { Conversation, Message } from "@shared/schema";
 
-// Separation of Concerns & Performance:
-// فصل شاشة الترحيب كمكون مستقل لتجنب إعادة تصييرها مع أي تحديث (Re-render) في حالة المحادثة الرئيسية.
-const HeroSection = memo(({
-  onSend,
-  isLoading
-}: {
-  onSend: (content: string, systemPrompt?: string) => void;
-  isLoading: boolean;
-}) => (
-  <div className="flex-1 flex flex-col items-center justify-center px-4 relative z-10 w-full animate-in fade-in duration-1000">
-    <div className="flex flex-col items-center mb-16 max-w-2xl text-center space-y-6">
-      {/* الجماليات: تدرجات ضوئية، تباين عالي، وتوهج سينمائي للخط */}
-      <h2
-        className="hero-brand-title"
-        data-testid="text-hero-title"
-      >
-        نبضـ.
-      </h2>
-      <p
-        className="hero-brand-subtitle"
-        data-testid="text-hero-subtitle"
-      >
-        مساعدك المرجعي،{" "}
-        <span className="hero-brand-focus">جاهز للتفكير.</span>
-      </p>
-    </div>
+interface SkillSummary {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  samplePrompts: string[];
+}
 
-    <ChatInput
-      onSend={onSend}
-      isLoading={isLoading}
-      variant="hero"
-    />
-  </div>
-));
+interface SkillsResponse {
+  count: number;
+  items: SkillSummary[];
+}
+
+interface PromptProfileSummary {
+  id: string;
+  label: string;
+  description: string;
+  promptLength: number;
+}
+
+interface PromptProfilesResponse {
+  count: number;
+  items: PromptProfileSummary[];
+}
+
+const QUICK_STARTS = [
+  "ابنِ لي خطة تعلّم عملية لمدة 30 يومًا",
+  "راجع هذا النص وقدم نسخة أوضح وأكثر إقناعًا",
+  "ساعدني في تفكيك مشكلة تقنية مع خطوات تنفيذية",
+];
+
+const HeroSection = memo(
+  ({
+    onSend,
+    isLoading,
+    skills,
+    promptProfiles,
+  }: {
+    onSend: (content: string, systemPromptId?: string) => void;
+    isLoading: boolean;
+    skills: SkillSummary[];
+    promptProfiles: PromptProfileSummary[];
+  }) => (
+    <div className="flex-1 overflow-y-auto px-4 py-7 md:px-8 md:py-10">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
+        <section className="hero-signal hero-surface rork-panel-strong grid gap-8 rounded-[2rem] p-6 backdrop-blur-md md:grid-cols-[1.22fr_0.78fr] md:p-10">
+          <div className="space-y-6">
+            <div className="rork-chip inline-flex items-center rounded-full px-4 py-2 text-xs font-semibold">
+              مساعدك المرجعي، جاهز للتفكير.
+            </div>
+            <h2 className="hero-brand-title" data-testid="text-hero-title">
+              نبضـ.
+            </h2>
+            <p className="hero-brand-subtitle" data-testid="text-hero-subtitle">
+              صياغة أدق، تنظيم أعمق، وتنفيذ أسرع.
+              <br />
+              <span className="hero-brand-focus">كل سؤال يتحول إلى قرار عملي.</span>
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {QUICK_STARTS.map((prompt) => (
+                <button
+                  key={prompt}
+                  onClick={() => onSend(prompt)}
+                  className="rork-chip rounded-2xl px-3.5 py-2 text-sm"
+                  data-testid={`button-quick-start-${prompt}`}
+                >
+                  {prompt}
+                </button>
+              ))}
+            </div>
+            {skills.length > 0 && (
+              <div className="flex flex-wrap gap-2 pt-1">
+                {skills.slice(0, 5).map((skill) => (
+                  <button
+                    key={skill.id}
+                    onClick={() =>
+                      onSend(
+                        skill.samplePrompts?.[0] ??
+                          `استخدم مهارة ${skill.name} لحل هذا الطلب.`,
+                      )
+                    }
+                    className="rork-chip rounded-full px-3 py-1.5 text-xs"
+                    data-testid={`button-skill-chip-${skill.id}`}
+                  >
+                    {skill.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="grid gap-3 self-end md:pb-1">
+            <div className="hero-chip hover-rise rounded-3xl p-4">
+              <p className="text-xs font-semibold text-foreground/50">نمط العمل</p>
+              <p className="mt-1 text-base font-semibold text-foreground">تفكير منطقي ثم إجابة مباشرة</p>
+            </div>
+            <div className="hero-chip hover-rise rounded-3xl p-4">
+              <p className="text-xs font-semibold text-foreground/50">الدقة السياقية</p>
+              <p className="mt-1 text-base font-semibold text-foreground">يربط طلبك بالمعلومة الأهم دون ضجيج</p>
+            </div>
+            <div className="hero-chip hover-rise rounded-3xl p-4">
+              <p className="text-xs font-semibold text-foreground/50">زمن الوصول</p>
+              <p className="mt-1 text-base font-semibold text-foreground">واجهة مبسطة بتفاعل سريع ومقروئية عالية</p>
+            </div>
+          </div>
+        </section>
+
+        <ChatInput
+          onSend={onSend}
+          isLoading={isLoading}
+          variant="hero"
+          promptProfiles={promptProfiles}
+        />
+        <BentoGrid onSelectTool={(prompt) => onSend(prompt)} skills={skills} />
+      </div>
+    </div>
+  ),
+);
 
 HeroSection.displayName = "HeroSection";
-
 
 export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -53,10 +137,21 @@ export default function Home() {
     queryKey: ["/api/conversations"],
   });
 
+  const { data: skillsResponse } = useQuery<SkillsResponse>({
+    queryKey: ["/api/skills"],
+  });
+
+  const { data: promptProfilesResponse } = useQuery<PromptProfilesResponse>({
+    queryKey: ["/api/ai/prompt-profiles"],
+  });
+
   const { data: messages = [] } = useQuery<Message[]>({
     queryKey: ["/api/conversations", activeConversationId, "messages"],
     enabled: !!activeConversationId,
   });
+
+  const skills = skillsResponse?.items ?? [];
+  const promptProfiles = promptProfilesResponse?.items ?? [];
 
   const createConversation = useMutation({
     mutationFn: async (title: string) => {
@@ -70,11 +165,19 @@ export default function Home() {
   });
 
   const sendMessage = useMutation({
-    mutationFn: async ({ conversationId, content, systemPrompt }: { conversationId: string; content: string; systemPrompt?: string }) => {
+    mutationFn: async ({
+      conversationId,
+      content,
+      systemPromptId,
+    }: {
+      conversationId: string;
+      content: string;
+      systemPromptId?: string;
+    }) => {
       const res = await apiRequest("POST", `/api/conversations/${conversationId}/messages`, {
         content,
         role: "user",
-        systemPrompt,
+        systemPromptId,
       });
       return res.json();
     },
@@ -97,13 +200,13 @@ export default function Home() {
     },
   });
 
-  const handleSend = useCallback(async (content: string, systemPrompt?: string) => {
+  const handleSend = useCallback(async (content: string, systemPromptId?: string) => {
     if (!activeConversationId) {
       const shortTitle = content.length > 30 ? content.slice(0, 30) + "..." : content;
       const conv = await createConversation.mutateAsync(shortTitle);
-      await sendMessage.mutateAsync({ conversationId: conv.id, content, systemPrompt });
+      await sendMessage.mutateAsync({ conversationId: conv.id, content, systemPromptId });
     } else {
-      await sendMessage.mutateAsync({ conversationId: activeConversationId, content, systemPrompt });
+      await sendMessage.mutateAsync({ conversationId: activeConversationId, content, systemPromptId });
     }
   }, [activeConversationId, createConversation, sendMessage]);
 
@@ -111,17 +214,19 @@ export default function Home() {
   const isInChat = !!activeConversationId;
 
   return (
-    // الخلفية: اعتماد نظام الألوان الجديد من Tailwind، وإلغاء Inline Styles العشوائية
-    <div className="flex h-screen w-full bg-background overflow-hidden relative">
-
-      {/* التفاصيل البصرية: تراكبات الحبوب (Noise/Grain Texture) والإضاءة المنتشرة */}
+    <div className="relative flex h-screen w-full overflow-hidden bg-background">
       <div
-        className="absolute inset-0 z-0 opacity-[0.03] mix-blend-overlay pointer-events-none"
-        style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.85%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E")' }}
-      ></div>
-      <div className="absolute top-0 right-1/4 w-[800px] h-[600px] bg-primary/5 rounded-full blur-[120px] pointer-events-none z-0 mix-blend-screen isolate opacity-60"></div>
+        className="pointer-events-none absolute inset-0 z-0 opacity-[0.12] mix-blend-screen"
+        style={{
+          backgroundImage:
+            "linear-gradient(115deg, transparent 0%, hsl(var(--foreground)/0.12) 1.5%, transparent 3.5%, transparent 100%), linear-gradient(to right, hsl(var(--foreground)/0.08) 1px, transparent 1px), linear-gradient(to bottom, hsl(var(--foreground)/0.08) 1px, transparent 1px)",
+          backgroundSize: "100% 100%, 24px 24px, 24px 24px",
+        }}
+      />
+      <div className="pointer-events-none absolute -left-24 top-10 h-[320px] w-[320px] rounded-full bg-accent/30 blur-[90px]" />
+      <div className="pointer-events-none absolute -right-28 bottom-12 h-[360px] w-[360px] rounded-full bg-primary/28 blur-[95px]" />
 
-      <div className="flex flex-col flex-1 min-w-0 z-10">
+      <div className="z-10 flex min-w-0 flex-1 flex-col">
         <NabdHeader
           onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
           conversationTitle={activeConversation?.title}
@@ -131,19 +236,18 @@ export default function Home() {
           <HeroSection
             onSend={handleSend}
             isLoading={sendMessage.isPending || createConversation.isPending}
+            skills={skills}
+            promptProfiles={promptProfiles}
           />
         ) : (
-          <div className="flex-1 flex flex-col min-h-0 animate-in fade-in slide-in-from-bottom-4 duration-500 w-full relative">
-            {/* مساحة المحادثة النشطة (Chat Mode) */}
-            <ChatMessages
-              messages={messages}
-              isLoading={sendMessage.isPending}
-            />
-            <div className="relative w-full pb-4">
+          <div className="relative flex w-full min-h-0 flex-1 animate-in fade-in slide-in-from-bottom-4 duration-500 flex-col">
+            <ChatMessages messages={messages} isLoading={sendMessage.isPending} />
+            <div className="relative w-full pb-5 pt-2">
               <ChatInput
                 onSend={handleSend}
                 isLoading={sendMessage.isPending}
                 variant="chat"
+                promptProfiles={promptProfiles}
               />
             </div>
           </div>

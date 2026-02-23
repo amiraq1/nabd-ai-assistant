@@ -1,6 +1,7 @@
-import { z } from "zod";
+import { listExecutableSkills, runSkill } from "../skills/registry.js";
+import type { SkillPlannerExtractor } from "../skills/types.js";
 
-export type ToolName = "date_time" | "weather" | "web_search";
+export type ToolName = string;
 
 interface ToolSchema {
   type: "object";
@@ -14,310 +15,69 @@ export interface ToolExecutionOutput {
   metadata?: Record<string, unknown>;
 }
 
-interface ToolDefinition<TInput extends Record<string, unknown>> {
-  name: ToolName;
-  description: string;
-  inputSchema: ToolSchema;
-  parseInput: (input: unknown) => TInput;
-  execute: (input: TInput) => Promise<ToolExecutionOutput>;
+export interface ToolPlanningMatch {
+  toolName: ToolName;
+  toolInput: Record<string, unknown>;
+  objective: string;
+  score: number;
 }
 
-const REQUEST_TIMEOUT_MS = 8_000;
-
-const WEATHER_CODE_AR: Record<number, string> = {
-  0: "صحو",
-  1: "غائم جزئياً",
-  2: "غائم",
-  3: "غائم كلياً",
-  45: "ضباب",
-  48: "ضباب متجمد",
-  51: "رذاذ خفيف",
-  53: "رذاذ متوسط",
-  55: "رذاذ كثيف",
-  56: "رذاذ متجمد خفيف",
-  57: "رذاذ متجمد كثيف",
-  61: "مطر خفيف",
-  63: "مطر متوسط",
-  65: "مطر غزير",
-  66: "مطر متجمد خفيف",
-  67: "مطر متجمد غزير",
-  71: "ثلج خفيف",
-  73: "ثلج متوسط",
-  75: "ثلج كثيف",
-  77: "حبوب ثلج",
-  80: "زخات مطر خفيفة",
-  81: "زخات مطر متوسطة",
-  82: "زخات مطر عنيفة",
-  85: "زخات ثلج خفيفة",
-  86: "زخات ثلج كثيفة",
-  95: "عاصفة رعدية",
-  96: "عاصفة رعدية مع برد خفيف",
-  99: "عاصفة رعدية مع برد كثيف",
-};
-
-const dateTimeInputSchema = z.object({}).passthrough();
-const weatherInputSchema = z.object({
-  location: z.string().min(2, "الموقع مطلوب"),
-});
-const webSearchInputSchema = z.object({
-  query: z.string().min(2, "عبارة البحث مطلوبة"),
-});
-
-function buildNowText(): string {
-  const now = new Date();
-  const date = new Intl.DateTimeFormat("ar-SA", {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  }).format(now);
-  const time = new Intl.DateTimeFormat("ar-SA", {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: true,
-  }).format(now);
-  return `الوقت الحالي هو ${time}، والتاريخ اليوم ${date}.`;
-}
-
-async function fetchJson<T>(url: string): Promise<T> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-  try {
-    const response = await fetch(url, { signal: controller.signal });
-    if (!response.ok) {
-      throw new Error(`request failed: ${response.status}`);
-    }
-    return (await response.json()) as T;
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-interface OpenMeteoGeocodeResponse {
-  results?: Array<{
+export interface ModelToolDefinition {
+  type: "function";
+  function: {
     name: string;
-    country?: string;
-    latitude: number;
-    longitude: number;
-  }>;
-}
-
-interface OpenMeteoWeatherResponse {
-  current?: {
-    temperature_2m?: number;
-    relative_humidity_2m?: number;
-    apparent_temperature?: number;
-    weather_code?: number;
-    wind_speed_10m?: number;
+    description: string;
+    parameters: ToolSchema;
   };
 }
 
-async function getWeatherForLocation(location: string): Promise<ToolExecutionOutput> {
-  const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(location)}&count=1&language=ar&format=json`;
-  const geoData = await fetchJson<OpenMeteoGeocodeResponse>(geoUrl);
-  const match = geoData.results?.[0];
-
-  if (!match) {
-    return {
-      text: `لم أتمكن من تحديد الموقع "${location}". حاول كتابة اسم مدينة أوضح.`,
-    };
-  }
-
-  const weatherUrl =
-    `https://api.open-meteo.com/v1/forecast` +
-    `?latitude=${match.latitude}` +
-    `&longitude=${match.longitude}` +
-    `&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m` +
-    `&timezone=auto`;
-
-  const weatherData = await fetchJson<OpenMeteoWeatherResponse>(weatherUrl);
-  const current = weatherData.current;
-
-  if (!current) {
-    return {
-      text: `تم العثور على الموقع "${match.name}" لكن بيانات الطقس غير متاحة حالياً.`,
-    };
-  }
-
-  const weatherText =
-    current.weather_code !== undefined
-      ? WEATHER_CODE_AR[current.weather_code] ?? `رمز حالة الطقس ${current.weather_code}`
-      : "غير متاح";
-
-  const label = [match.name, match.country].filter(Boolean).join("، ");
-  const temperature =
-    current.temperature_2m !== undefined ? `${current.temperature_2m.toFixed(1)}°م` : "غير متاح";
-  const feelsLike =
-    current.apparent_temperature !== undefined ? `${current.apparent_temperature.toFixed(1)}°م` : "غير متاح";
-  const humidity =
-    current.relative_humidity_2m !== undefined ? `${current.relative_humidity_2m}%` : "غير متاح";
-  const wind =
-    current.wind_speed_10m !== undefined ? `${current.wind_speed_10m} كم/س` : "غير متاح";
-
-  return {
-    text:
-      `الطقس الحالي في ${label}:\n` +
-      `- الحالة: ${weatherText}\n` +
-      `- الحرارة: ${temperature}\n` +
-      `- المحسوسة: ${feelsLike}\n` +
-      `- الرطوبة: ${humidity}\n` +
-      `- سرعة الرياح: ${wind}`,
-    metadata: {
-      location: label,
-      latitude: match.latitude,
-      longitude: match.longitude,
-    },
-  };
-}
-
-interface WikipediaSearchResponse {
-  query?: {
-    search?: Array<{
-      title: string;
-      snippet: string;
-      pageid: number;
-    }>;
-  };
-}
-
-function stripHtml(input: string): string {
-  return input.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
-}
-
-async function searchWeb(query: string): Promise<ToolExecutionOutput> {
-  const wikiUrl =
-    `https://ar.wikipedia.org/w/api.php?action=query&list=search&format=json` +
-    `&utf8=1&srlimit=5&origin=*&srsearch=${encodeURIComponent(query)}`;
-
-  const wiki = await fetchJson<WikipediaSearchResponse>(wikiUrl);
-  const hits = (wiki.query?.search ?? []).slice(0, 3);
-
-  if (hits.length === 0) {
-    return {
-      text: `لم أجد نتائج واضحة لعبارة "${query}" في البحث السريع.`,
-    };
-  }
-
-  const lines = hits.map((hit, index) => {
-    const url = `https://ar.wikipedia.org/?curid=${hit.pageid}`;
-    return `${index + 1}. ${hit.title}\n${stripHtml(hit.snippet)}\nالرابط: ${url}`;
-  });
-
-  return {
-    text: `نتائج البحث عن "${query}":\n${lines.join("\n\n")}`,
-    metadata: {
-      query,
-      count: hits.length,
-      source: "wikipedia",
-    },
-  };
-}
-
-const TOOL_REGISTRY: Record<ToolName, ToolDefinition<Record<string, unknown>>> = {
-  date_time: {
-    name: "date_time",
-    description: "إرجاع التاريخ والوقت الحاليين بشكل منسق.",
-    inputSchema: {
-      type: "object",
-      properties: {},
-      required: [],
-      additionalProperties: false,
-    },
-    parseInput: (input) => dateTimeInputSchema.parse(input),
-    execute: async () => ({ text: buildNowText() }),
-  },
-  weather: {
-    name: "weather",
-    description: "جلب حالة الطقس الحالية لمدينة محددة.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        location: {
-          type: "string",
-          description: "اسم المدينة أو الموقع المراد جلب الطقس له.",
-        },
-      },
-      required: ["location"],
-      additionalProperties: false,
-    },
-    parseInput: (input) => weatherInputSchema.parse(input),
-    execute: async (input) => getWeatherForLocation(input.location as string),
-  },
-  web_search: {
-    name: "web_search",
-    description: "تنفيذ بحث ويب سريع وإرجاع ملخص نتائج موثوقة.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        query: {
-          type: "string",
-          description: "العبارة أو السؤال المراد البحث عنه.",
-        },
-      },
-      required: ["query"],
-      additionalProperties: false,
-    },
-    parseInput: (input) => webSearchInputSchema.parse(input),
-    execute: async (input) => searchWeb(input.query as string),
-  },
+const CITY_TIMEZONE_MAP: Record<string, string> = {
+  الرياض: "Asia/Riyadh",
+  جدة: "Asia/Riyadh",
+  مكة: "Asia/Riyadh",
+  المدينة: "Asia/Riyadh",
+  dubai: "Asia/Dubai",
+  دبي: "Asia/Dubai",
+  أبوظبي: "Asia/Dubai",
+  cairo: "Africa/Cairo",
+  القاهرة: "Africa/Cairo",
+  tokyo: "Asia/Tokyo",
+  طوكيو: "Asia/Tokyo",
+  london: "Europe/London",
+  لندن: "Europe/London",
+  paris: "Europe/Paris",
+  باريس: "Europe/Paris",
+  newyork: "America/New_York",
+  "new york": "America/New_York",
+  "نيويورك": "America/New_York",
 };
 
-export function listToolDefinitions(): Array<{
-  name: ToolName;
-  description: string;
-  inputSchema: ToolSchema;
-}> {
-  return Object.values(TOOL_REGISTRY).map((tool) => ({
-    name: tool.name,
-    description: tool.description,
-    inputSchema: tool.inputSchema,
-  }));
+function normalizeForIntent(input: string): string {
+  return input.toLowerCase().replace(/\s+/g, " ").trim();
 }
 
-export function looksLikeDateTimeIntent(input: string): boolean {
-  return [
-    /الوقت/,
-    /الساعة/,
-    /التوقيت/,
-    /التاريخ/,
-    /اليوم/,
-    /\btime\b/i,
-    /\bdate\b/i,
-    /\btoday\b/i,
-    /\bnow\b/i,
-  ].some((pattern) => pattern.test(input));
-}
-
-export function looksLikeWeatherIntent(input: string): boolean {
-  return [
-    /طقس/,
-    /الطقس/,
-    /درجة الحرارة/,
-    /حرارة/,
-    /weather/i,
-    /forecast/i,
-  ].some((pattern) => pattern.test(input));
-}
-
-export function looksLikeWebSearchIntent(input: string): boolean {
-  return [
-    /ابحث/,
-    /بحث/,
-    /معلومات عن/,
-    /أخبار/,
-    /news/i,
-    /search/i,
-    /what is/i,
-    /who is/i,
-  ].some((pattern) => pattern.test(input));
+function normalizeArabicDigits(input: string): string {
+  const map: Record<string, string> = {
+    "٠": "0",
+    "١": "1",
+    "٢": "2",
+    "٣": "3",
+    "٤": "4",
+    "٥": "5",
+    "٦": "6",
+    "٧": "7",
+    "٨": "8",
+    "٩": "9",
+  };
+  return input.replace(/[٠-٩]/g, (digit) => map[digit] ?? digit);
 }
 
 export function extractLocationFromText(input: string): string | null {
   const cleaned = input.trim();
   const patterns = [
     /(?:في|ب)\s+([^\n،,.؟!]+)/,
-    /(?:طقس|weather)\s+([^\n،,.؟!]+)/i,
+    /(?:طقس|weather|forecast)\s+([^\n،,.؟!]+)/i,
+    /(?:مدينة|city)\s+([^\n،,.؟!]+)/i,
   ];
 
   for (const pattern of patterns) {
@@ -335,18 +95,235 @@ export function extractSearchQuery(input: string): string {
   const normalized = cleaned
     .replace(/^(ابحث(?:\s+لي)?(?:\s+عن)?)/, "")
     .replace(/^(search(?:\s+for)?)/i, "")
-    .replace(/^(اعطني معلومات عن)/, "")
-    .replace(/^(من هو|ما هو)/, "")
+    .replace(/^(اعطني|اعطني معلومات|أعطني|أعطني معلومات)\s+(?:عن)?/, "")
+    .replace(/^(من هو|ما هو|ما هي)/, "")
+    .replace(/^(tell me about)/i, "")
     .trim();
 
   return normalized || cleaned;
 }
 
+function extractTimezoneFromText(input: string): string | null {
+  const cleaned = input.trim();
+  const explicitTz = cleaned.match(/([A-Za-z]+\/[A-Za-z_+-]+)/);
+  if (explicitTz?.[1]) {
+    return explicitTz[1];
+  }
+
+  const locationMatch = cleaned.match(/(?:في|ب|for|in)\s+([^\n،,.؟!]+)/i);
+  const location = locationMatch?.[1]?.trim().toLowerCase();
+  if (location && CITY_TIMEZONE_MAP[location]) {
+    return CITY_TIMEZONE_MAP[location];
+  }
+
+  for (const [key, value] of Object.entries(CITY_TIMEZONE_MAP)) {
+    if (cleaned.toLowerCase().includes(key.toLowerCase())) {
+      return value;
+    }
+  }
+
+  return null;
+}
+
+function extractCurrencyFromText(input: string): {
+  from?: string;
+  to?: string;
+  amount?: number;
+} {
+  const cleaned = normalizeArabicDigits(input).toUpperCase();
+  const pairWithAmount = cleaned.match(
+    /(\d+(?:\.\d+)?)\s*([A-Z]{3})\s*(?:إلى|الى|TO|->|→)\s*([A-Z]{3})/i,
+  );
+  if (pairWithAmount) {
+    return {
+      amount: Number(pairWithAmount[1]),
+      from: pairWithAmount[2],
+      to: pairWithAmount[3],
+    };
+  }
+
+  const pairOnly = cleaned.match(/(?:من|FROM)\s*([A-Z]{3})\s*(?:إلى|الى|TO)\s*([A-Z]{3})/i);
+  if (pairOnly) {
+    return {
+      amount: 1,
+      from: pairOnly[1],
+      to: pairOnly[2],
+    };
+  }
+
+  const codes = cleaned.match(/\b[A-Z]{3}\b/g) ?? [];
+  if (codes.length >= 2) {
+    return { from: codes[0], to: codes[1], amount: 1 };
+  }
+
+  return { from: "USD", to: "SAR", amount: 1 };
+}
+
+function extractCountryFromText(input: string): string | null {
+  const cleaned = input.trim();
+  const patterns = [
+    /(?:عن|حول|داخل|في)\s+([^\n،,.؟!]+)/,
+    /(?:country|capital of)\s+([^\n،,.؟!]+)/i,
+    /(?:دولة|بلد)\s+([^\n،,.؟!]+)/,
+  ];
+
+  for (const pattern of patterns) {
+    const match = cleaned.match(pattern);
+    if (match?.[1]) return match[1].trim();
+  }
+
+  return null;
+}
+
+function extractNewsTopic(input: string): string {
+  const cleaned = input.trim();
+  return cleaned
+    .replace(/^(أخبار|خبر|ما آخر أخبار|اعطني أخبار|أعطني أخبار)\s*/i, "")
+    .replace(/^(news|headlines|latest news)\s*/i, "")
+    .trim();
+}
+
+function extractIpFromText(input: string): string | null {
+  const ipv4 =
+    input.match(
+      /\b(?:(?:25[0-5]|2[0-4]\d|1?\d{1,2})\.){3}(?:25[0-5]|2[0-4]\d|1?\d{1,2})\b/,
+    )?.[0] ?? null;
+  if (ipv4) return ipv4;
+
+  const ipv6 = input.match(/\b(?:[a-fA-F0-9]{1,4}:){2,7}[a-fA-F0-9]{1,4}\b/)?.[0] ?? null;
+  return ipv6;
+}
+
+function computeIntentScore(
+  segment: string,
+  keywords: string[],
+  patterns?: string[],
+): number {
+  if (!keywords.length && (!patterns || patterns.length === 0)) {
+    return 0;
+  }
+
+  const normalized = normalizeForIntent(segment);
+  let score = 0;
+
+  for (const keyword of keywords) {
+    if (normalized.includes(keyword.toLowerCase())) {
+      score += 1;
+    }
+  }
+
+  for (const pattern of patterns ?? []) {
+    try {
+      if (new RegExp(pattern, "i").test(segment)) {
+        score += 2;
+      }
+    } catch {
+      // Ignore invalid regex in external skill manifests.
+    }
+  }
+
+  return score;
+}
+
+function buildInputFromExtractor(
+  extractor: SkillPlannerExtractor | undefined,
+  segment: string,
+): Record<string, unknown> {
+  switch (extractor) {
+    case "location":
+      return { location: extractLocationFromText(segment) ?? "الرياض" };
+    case "query":
+      return { query: extractSearchQuery(segment) };
+    case "currency": {
+      const parsed = extractCurrencyFromText(segment);
+      return {
+        from: parsed.from ?? "USD",
+        to: parsed.to ?? "SAR",
+        amount: parsed.amount ?? 1,
+      };
+    }
+    case "timezone":
+      return { timezone: extractTimezoneFromText(segment) ?? "Asia/Riyadh" };
+    case "country":
+      return { country: extractCountryFromText(segment) ?? "المملكة العربية السعودية" };
+    case "news_topic": {
+      const topic = extractNewsTopic(segment);
+      return topic ? { topic, language: "ar" } : { topic: "الذكاء الاصطناعي", language: "ar" };
+    }
+    case "ip":
+      return { ip: extractIpFromText(segment) ?? undefined };
+    case "none":
+    default:
+      return {};
+  }
+}
+
+export function matchToolForSegment(segment: string): ToolPlanningMatch | null {
+  const candidates = listExecutableSkills()
+    .map((skill) => {
+      const score = computeIntentScore(
+        segment,
+        skill.planner?.keywords ?? [],
+        skill.planner?.patterns,
+      );
+      if (score <= 0) return null;
+
+      return {
+        toolName: skill.id,
+        toolInput: buildInputFromExtractor(skill.planner?.extractor, segment),
+        objective:
+          skill.planner?.objective ??
+          `تشغيل مهارة ${skill.name} لمعالجة جزء الطلب: ${segment}`,
+        score: score + (skill.planner?.priority ?? 0) / 100,
+      } as ToolPlanningMatch;
+    })
+    .filter((item): item is ToolPlanningMatch => item !== null)
+    .sort((left, right) => right.score - left.score);
+
+  return candidates[0] ?? null;
+}
+
+export function listToolDefinitions(): Array<{
+  name: ToolName;
+  description: string;
+  inputSchema: ToolSchema;
+}> {
+  return listExecutableSkills().map((skill) => ({
+    name: skill.id,
+    description: skill.description,
+    inputSchema: skill.inputSchema,
+  }));
+}
+
+export function listModelToolDefinitions(): ModelToolDefinition[] {
+  return listExecutableSkills().map((skill) => ({
+    type: "function",
+    function: {
+      name: skill.id,
+      description: skill.description,
+      parameters: skill.inputSchema,
+    },
+  }));
+}
+
 export async function runTool(
   name: ToolName,
-  rawInput: Record<string, unknown> = {}
+  rawInput: Record<string, unknown> = {},
 ): Promise<ToolExecutionOutput> {
-  const tool = TOOL_REGISTRY[name];
-  const parsed = tool.parseInput(rawInput);
-  return tool.execute(parsed);
+  return runSkill(name, rawInput);
+}
+
+export function looksLikeDateTimeIntent(input: string): boolean {
+  const match = matchToolForSegment(input);
+  return match?.toolName === "date_time" || match?.toolName === "world_time";
+}
+
+export function looksLikeWeatherIntent(input: string): boolean {
+  const match = matchToolForSegment(input);
+  return match?.toolName === "weather";
+}
+
+export function looksLikeWebSearchIntent(input: string): boolean {
+  const match = matchToolForSegment(input);
+  return match?.toolName === "web_search" || match?.toolName === "news_headlines";
 }

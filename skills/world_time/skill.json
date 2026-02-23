@@ -1,0 +1,30 @@
+{
+  "id": "world_time",
+  "name": "الوقت العالمي",
+  "description": "إرجاع الوقت المحلي لمنطقة زمنية عالمية محددة.",
+  "category": "geo",
+  "version": "1.0.0",
+  "handler": "world_time",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "timezone": {
+        "type": "string",
+        "description": "منطقة زمنية بصيغة IANA مثل Europe/London"
+      }
+    },
+    "required": ["timezone"],
+    "additionalProperties": false
+  },
+  "planner": {
+    "keywords": ["الوقت في", "توقيت", "timezone", "world time", "الساعة في"],
+    "patterns": ["(?:الوقت في|الساعة في|توقيت)", "\\b(timezone|world time)\\b"],
+    "extractor": "timezone",
+    "objective": "إرجاع الوقت في مدينة أو منطقة زمنية عالمية.",
+    "priority": 28
+  },
+  "samplePrompts": [
+    "كم الوقت الآن في طوكيو؟",
+    "أعطني التوقيت الحالي في Europe/Paris"
+  ]
+}

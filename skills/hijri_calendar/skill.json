@@ -1,0 +1,30 @@
+{
+  "id": "hijri_calendar",
+  "name": "التقويم الهجري",
+  "description": "تحويل التاريخ الميلادي إلى التاريخ الهجري بصياغة عربية.",
+  "category": "arabic",
+  "version": "1.0.0",
+  "handler": "hijri_calendar",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "date": {
+        "type": "string",
+        "description": "تاريخ اختياري بصيغة YYYY-MM-DD"
+      }
+    },
+    "required": [],
+    "additionalProperties": false
+  },
+  "planner": {
+    "keywords": ["هجري", "التقويم الهجري", "رمضان", "hijri", "islamic calendar"],
+    "patterns": ["(?:هجري|التقويم الهجري)", "\\b(hijri|islamic calendar)\\b"],
+    "extractor": "none",
+    "objective": "إرجاع التاريخ الهجري بدقة مع مرجع ميلادي.",
+    "priority": 16
+  },
+  "samplePrompts": [
+    "ما التاريخ الهجري اليوم؟",
+    "حوّل 2026-03-10 إلى هجري"
+  ]
+}

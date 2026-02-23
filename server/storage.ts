@@ -119,7 +119,7 @@ export class MemStorage implements IStorage {
 
   async deleteConversation(id: string): Promise<void> {
     this.conversations.delete(id);
-    for (const [msgId, msg] of this.messages.entries()) {
+    for (const [msgId, msg] of Array.from(this.messages.entries())) {
       if (msg.conversationId === id) {
         this.messages.delete(msgId);
       }

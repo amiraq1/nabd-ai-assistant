@@ -1,0 +1,30 @@
+{
+  "id": "rest_countries",
+  "name": "الثقافة والجغرافيا",
+  "description": "معلومات موجزة عن دولة: العاصمة، السكان، العملة واللغات.",
+  "category": "culture",
+  "version": "1.0.0",
+  "handler": "rest_countries",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "country": {
+        "type": "string",
+        "description": "اسم الدولة"
+      }
+    },
+    "required": ["country"],
+    "additionalProperties": false
+  },
+  "planner": {
+    "keywords": ["دولة", "بلد", "عاصمة", "سكان", "country", "capital"],
+    "patterns": ["(?:دولة|بلد|عاصمة|سكان)", "\\b(country|capital)\\b"],
+    "extractor": "country",
+    "objective": "تقديم ملف معلومات موجز عن الدولة المطلوبة.",
+    "priority": 18
+  },
+  "samplePrompts": [
+    "أعطني معلومات سريعة عن المغرب",
+    "ما عاصمة كندا وعدد سكانها؟"
+  ]
+}

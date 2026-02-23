@@ -1,0 +1,38 @@
+{
+  "id": "exchange_rate",
+  "name": "الاقتصاد والعملات",
+  "description": "تحويل العملات وجلب سعر الصرف الحالي.",
+  "category": "economy",
+  "version": "1.0.0",
+  "handler": "exchange_rate",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "from": {
+        "type": "string",
+        "description": "رمز العملة الأساسية مثل USD"
+      },
+      "to": {
+        "type": "string",
+        "description": "رمز العملة الهدف مثل SAR"
+      },
+      "amount": {
+        "type": "number",
+        "description": "المبلغ المراد تحويله"
+      }
+    },
+    "required": ["from", "to"],
+    "additionalProperties": false
+  },
+  "planner": {
+    "keywords": ["صرف", "تحويل", "عملة", "عملات", "currency", "exchange", "usd", "eur", "sar"],
+    "patterns": ["(?:تحويل|سعر الصرف|صرف)", "\\b(exchange|currency|convert)\\b"],
+    "extractor": "currency",
+    "objective": "حساب سعر الصرف أو تحويل العملات.",
+    "priority": 35
+  },
+  "samplePrompts": [
+    "حوّل 100 USD إلى SAR",
+    "كم يساوي اليورو مقابل الدولار؟"
+  ]
+}

@@ -72,6 +72,11 @@ function cosineSimilarity(a: number[], b: number[]): number {
 export class InMemoryVectorStore {
   private readonly documents = new Map<string, StoredDocument>();
 
+  replaceAll(docs: VectorStoreDocument[]): void {
+    this.documents.clear();
+    this.upsertMany(docs);
+  }
+
   upsertMany(docs: VectorStoreDocument[]): void {
     for (const doc of docs) {
       const enriched: StoredDocument = {
@@ -104,5 +109,9 @@ export class InMemoryVectorStore {
       source: doc.source,
       content: doc.content,
     }));
+  }
+
+  size(): number {
+    return this.documents.size;
   }
 }

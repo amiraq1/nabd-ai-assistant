@@ -1,0 +1,30 @@
+{
+  "id": "date_time",
+  "name": "الوقت والتاريخ",
+  "description": "إرجاع الوقت والتاريخ الحاليين مع دعم منطقة زمنية اختيارية.",
+  "category": "utility",
+  "version": "1.0.0",
+  "handler": "date_time",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "timezone": {
+        "type": "string",
+        "description": "منطقة زمنية بصيغة IANA مثل Asia/Riyadh"
+      }
+    },
+    "required": [],
+    "additionalProperties": false
+  },
+  "planner": {
+    "keywords": ["الوقت", "الساعة", "التاريخ", "today", "time", "date", "now"],
+    "patterns": ["(?:الوقت|الساعة|التاريخ)", "\\b(time|date|today|now)\\b"],
+    "extractor": "timezone",
+    "objective": "إرجاع الوقت والتاريخ المناسبين لسؤال المستخدم.",
+    "priority": 20
+  },
+  "samplePrompts": [
+    "كم الوقت الآن؟",
+    "ما التاريخ اليوم في الرياض؟"
+  ]
+}

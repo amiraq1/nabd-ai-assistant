@@ -1,0 +1,30 @@
+{
+  "id": "weather",
+  "name": "الطقس",
+  "description": "جلب حالة الطقس الحالية لمدينة محددة.",
+  "category": "utility",
+  "version": "1.0.0",
+  "handler": "weather",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "location": {
+        "type": "string",
+        "description": "اسم المدينة أو الموقع"
+      }
+    },
+    "required": ["location"],
+    "additionalProperties": false
+  },
+  "planner": {
+    "keywords": ["طقس", "الطقس", "الحرارة", "درجة الحرارة", "weather", "forecast"],
+    "patterns": ["(?:طقس|الطقس|درجة الحرارة)", "\\b(weather|forecast)\\b"],
+    "extractor": "location",
+    "objective": "جمع حالة الطقس الحالية للموقع المطلوب.",
+    "priority": 30
+  },
+  "samplePrompts": [
+    "ما حالة الطقس في جدة؟",
+    "أعطني درجة الحرارة الآن في دبي"
+  ]
+}

@@ -7,8 +7,31 @@ import path from "path";
 import { nanoid } from "nanoid";
 
 const viteLogger = createLogger();
+const VITE_DEV_CACHE_PREFIX = ".vite-dev-cache-";
 
 export async function setupVite(server: Server, app: Express) {
+  const nodeModulesDir = path.resolve(import.meta.dirname, "..", "node_modules");
+  const devCacheDirName = `${VITE_DEV_CACHE_PREFIX}${Date.now()}-${process.pid}`;
+  const devCacheDir = path.join(nodeModulesDir, devCacheDirName);
+
+  // Best-effort cleanup to avoid accumulating per-run cache dirs.
+  try {
+    const entries = await fs.promises.readdir(nodeModulesDir, { withFileTypes: true });
+    const staleDirs = entries.filter(
+      (entry) => entry.isDirectory() && entry.name.startsWith(VITE_DEV_CACHE_PREFIX),
+    );
+    await Promise.all(
+      staleDirs.map((entry) =>
+        fs.promises.rm(path.join(nodeModulesDir, entry.name), {
+          recursive: true,
+          force: true,
+        }),
+      ),
+    );
+  } catch {
+    // Ignore cleanup errors; this cache is development-only.
+  }
+
   const serverOptions = {
     middlewareMode: true,
     hmr: { server, path: "/vite-hmr" },
@@ -17,6 +40,11 @@ export async function setupVite(server: Server, app: Express) {
 
   const vite = await createViteServer({
     ...viteConfig,
+    cacheDir: devCacheDir,
+    optimizeDeps: {
+      ...(viteConfig.optimizeDeps ?? {}),
+      force: true,
+    },
     configFile: false,
     customLogger: {
       ...viteLogger,
@@ -25,8 +53,37 @@ export async function setupVite(server: Server, app: Express) {
         process.exit(1);
       },
     },
-    server: serverOptions,
+    server: {
+      ...(viteConfig.server ?? {}),
+      ...serverOptions,
+    },
     appType: "custom",
+  });
+
+  // Prevent stale/corrupted browser cache for Vite dep chunks on Windows/WSL dev setups.
+  app.use((req, res, next) => {
+    const isViteDepRequest =
+      req.path.startsWith("/@fs/") ||
+      req.path.startsWith("/node_modules/.vite/");
+
+    if (!isViteDepRequest) {
+      return next();
+    }
+
+    const noStore = "no-store, no-cache, must-revalidate, proxy-revalidate";
+    const originalSetHeader = res.setHeader.bind(res);
+
+    res.setHeader = ((name: string, value: number | string | readonly string[]) => {
+      if (name.toLowerCase() === "cache-control") {
+        return originalSetHeader(name, noStore);
+      }
+      return originalSetHeader(name, value);
+    }) as typeof res.setHeader;
+
+    originalSetHeader("Cache-Control", noStore);
+    originalSetHeader("Pragma", "no-cache");
+    originalSetHeader("Expires", "0");
+    return next();
   });
 
   app.use(vite.middlewares);

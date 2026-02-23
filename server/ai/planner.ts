@@ -1,11 +1,4 @@
-import {
-  extractLocationFromText,
-  extractSearchQuery,
-  looksLikeDateTimeIntent,
-  looksLikeWeatherIntent,
-  looksLikeWebSearchIntent,
-  type ToolName,
-} from "./tools.js";
+import { matchToolForSegment, type ToolName } from "./tools.js";
 
 export interface PlanStep {
   id: string;
@@ -22,7 +15,10 @@ export interface ExecutionPlan {
 
 function normalizeForPlanning(input: string): string {
   return input
-    .replace(/\s+و(?=(ابحث|search|طقس|الطقس|درجة الحرارة|الوقت|التاريخ))/gi, " ثم ")
+    .replace(
+      /\s+و(?=(ابحث|search|طقس|الطقس|درجة الحرارة|الوقت|التاريخ|الأخبار|خبر|صرف|تحويل))/gi,
+      " ثم ",
+    )
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -30,7 +26,7 @@ function normalizeForPlanning(input: string): string {
 function splitIntoPlanSegments(input: string): string[] {
   const normalized = normalizeForPlanning(input);
   const segments = normalized
-    .split(/\s+(?:ثم|وبعد ذلك|بعدها)\s+|[،,\n]+/)
+    .split(/\s+(?:ثم|وبعد ذلك|بعدها|and then|then)\s+|[،,\n]+/)
     .map((part) => part.trim())
     .filter(Boolean);
 
@@ -42,52 +38,29 @@ function splitIntoPlanSegments(input: string): string[] {
 }
 
 function toToolStep(segment: string): Omit<PlanStep, "id"> | null {
-  if (looksLikeWeatherIntent(segment)) {
-    return {
-      kind: "tool",
-      objective: `الحصول على حالة الطقس لجزء الطلب: ${segment}`,
-      toolName: "weather",
-      toolInput: {
-        location: extractLocationFromText(segment) ?? "الرياض",
-      },
-    };
-  }
+  const match = matchToolForSegment(segment);
+  if (!match) return null;
 
-  if (looksLikeWebSearchIntent(segment)) {
-    return {
-      kind: "tool",
-      objective: `تنفيذ بحث ويب لجزء الطلب: ${segment}`,
-      toolName: "web_search",
-      toolInput: {
-        query: extractSearchQuery(segment),
-      },
-    };
-  }
-
-  if (looksLikeDateTimeIntent(segment)) {
-    return {
-      kind: "tool",
-      objective: `إرجاع الوقت والتاريخ الحاليين لجزء الطلب: ${segment}`,
-      toolName: "date_time",
-      toolInput: {},
-    };
-  }
-
-  return null;
+  return {
+    kind: "tool",
+    objective: match.objective,
+    toolName: match.toolName,
+    toolInput: match.toolInput,
+  };
 }
 
 export function buildExecutionPlan(content: string): ExecutionPlan {
   const segments = splitIntoPlanSegments(content);
   const steps: PlanStep[] = [];
 
-  for (let i = 0; i < segments.length; i += 1) {
-    const toolStep = toToolStep(segments[i]);
-    if (toolStep) {
-      steps.push({
-        ...toolStep,
-        id: `step-${steps.length + 1}`,
-      });
-    }
+  for (const segment of segments) {
+    const toolStep = toToolStep(segment);
+    if (!toolStep) continue;
+
+    steps.push({
+      ...toolStep,
+      id: `step-${steps.length + 1}`,
+    });
   }
 
   if (steps.length === 0) {
@@ -106,7 +79,7 @@ export function buildExecutionPlan(content: string): ExecutionPlan {
   steps.push({
     id: `step-${steps.length + 1}`,
     kind: "synthesis",
-    objective: "دمج نتائج الأدوات مع السياق وإنتاج إجابة نهائية واضحة.",
+    objective: "دمج نتائج المهارات مع السياق وإنتاج إجابة نهائية واضحة.",
   });
 
   return {

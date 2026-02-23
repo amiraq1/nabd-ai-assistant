@@ -6,6 +6,10 @@ import {
   previewOrchestration,
 } from "./ai/orchestrator.js";
 import {
+  getPromptProfileById,
+  listPromptProfiles,
+} from "./ai/prompt-profiles.js";
+import {
   getLatestTrace,
   getTraceHistory,
   recordTrace,
@@ -14,6 +18,12 @@ import {
   listKnowledgeDocuments,
   upsertKnowledgeDocuments,
 } from "./rag/retriever.js";
+import {
+  buildAvailableSkillsXml,
+  getSkillsDiagnostics,
+  listSkills,
+  refreshSkills,
+} from "./skills/registry.js";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -148,7 +158,48 @@ export async function registerRoutes(
         total: listKnowledgeDocuments().length,
       });
     });
+
+    app.get("/api/ai/debug/skills", requireDebugAuth, (_req, res) => {
+      return res.json(getSkillsDiagnostics());
+    });
+
+    app.post("/api/ai/debug/skills/reload", requireDebugAuth, (_req, res) => {
+      refreshSkills(true);
+      return res.json(getSkillsDiagnostics());
+    });
+
+    app.get("/api/ai/debug/skills/prompt", requireDebugAuth, (_req, res) => {
+      res.type("text/plain");
+      return res.send(buildAvailableSkillsXml());
+    });
   }
+
+  app.get("/api/skills", (_req, res) => {
+    const items = listSkills().map((skill) => ({
+      id: skill.id,
+      name: skill.name,
+      description: skill.description,
+      category: skill.category,
+      version: skill.version,
+      format: skill.format,
+      executable: skill.isExecutable,
+      location: skill.skillFilePath,
+      inputSchema: skill.inputSchema,
+      samplePrompts: skill.samplePrompts ?? [],
+    }));
+
+    return res.json({
+      count: items.length,
+      items,
+    });
+  });
+
+  app.get("/api/ai/prompt-profiles", (_req, res) => {
+    return res.json({
+      count: listPromptProfiles().length,
+      items: listPromptProfiles(),
+    });
+  });
 
   app.get("/api/conversations", async (_req, res) => {
     const convs = await storage.getConversations();
@@ -175,9 +226,24 @@ export async function registerRoutes(
   });
 
   app.post("/api/conversations/:id/messages", async (req, res) => {
-    const { content, role, systemPrompt } = req.body;
+    const { content, role, systemPrompt, systemPromptId } = req.body;
     if (!content || typeof content !== "string") {
       return res.status(400).json({ message: "المحتوى مطلوب" });
+    }
+
+    let resolvedSystemPrompt: string | undefined;
+    if (typeof systemPromptId === "string" && systemPromptId.trim()) {
+      const profile = getPromptProfileById(systemPromptId.trim());
+      if (!profile) {
+        return res.status(400).json({ message: "systemPromptId غير صالح" });
+      }
+      resolvedSystemPrompt = profile.prompt;
+    } else if (typeof systemPrompt === "string" && systemPrompt.trim()) {
+      const trimmed = systemPrompt.trim();
+      if (trimmed.length > 4000) {
+        return res.status(400).json({ message: "systemPrompt طويل جدًا" });
+      }
+      resolvedSystemPrompt = trimmed;
     }
 
     const userMsg = await storage.createMessage({
@@ -194,7 +260,7 @@ export async function registerRoutes(
 
       const result = await generateAssistantReply({
         content,
-        systemPrompt,
+        systemPrompt: resolvedSystemPrompt,
         history,
       });
       recordTrace(req.params.id, result.trace);

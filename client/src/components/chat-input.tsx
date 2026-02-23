@@ -6,30 +6,73 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
-// Separation of Concerns: يجب استخراج هذا لملف config مستقبلاً
-const SYSTEM_PROMPTS: Record<string, string> = {
-  "الترجمة": "أنت مترجم محترف. مهمتك هي ترجمة النص الذي يرسله المستخدم بدقة واحترافية عالية. لا تضف أي تعليقات أو شروحات، فقط أرسل الترجمة المباشرة.",
-  "البحث الذكي": "أنت مساعد ذكي للبحث. قم بتحليل طلب المستخدم وقدم إجابة ملخصة، دقيقة، ومباشرة في نقاط واضحة.",
-  "التحويل الصوتي": "أنت مساعد لتنسيق النصوص. قم بإعادة صياغة النص وتشكيله ليكون جاهزاً ومناسباً للقراءة الصوتية الآلية.",
-  "إبداع المحتوى": "أنت كاتب محتوى مبدع ومحترف. قم بكتابة نصوص جذابة، مقالات، أو أفكار إبداعية بأسلوب ممتع بناءً على طلب المستخدم.",
-};
-
-const TOOL_KEYS = Object.keys(SYSTEM_PROMPTS);
-
-interface ChatInputProps {
-  onSend: (message: string, systemPrompt: string) => void;
-  isLoading?: boolean;
-  variant?: "hero" | "chat";
+export interface PromptProfileOption {
+  id: string;
+  label: string;
+  description: string;
+  promptLength?: number;
 }
 
-export function ChatInput({ onSend, isLoading, variant = "chat" }: ChatInputProps) {
+const FALLBACK_PROFILES: PromptProfileOption[] = [
+  {
+    id: "default_balanced",
+    label: "محادثة ذكية",
+    description: "توازن بين الوضوح والدقة.",
+  },
+  {
+    id: "frontend_architect",
+    label: "مهندس واجهات",
+    description: "حلول تقنية منظمة وقابلة للصيانة.",
+  },
+  {
+    id: "research_rag",
+    label: "بحث تحليلي",
+    description: "تحليل مع الاستفادة من المصادر المتاحة.",
+  },
+  {
+    id: "translation_pro",
+    label: "الترجمة",
+    description: "ترجمة دقيقة تحفظ المعنى.",
+  },
+  {
+    id: "content_writer",
+    label: "إبداع المحتوى",
+    description: "صياغة عربية جذابة ومهنية.",
+  },
+];
+
+interface ChatInputProps {
+  onSend: (message: string, systemPromptId?: string) => void;
+  isLoading?: boolean;
+  variant?: "hero" | "chat";
+  promptProfiles?: PromptProfileOption[];
+}
+
+export function ChatInput({
+  onSend,
+  isLoading,
+  variant = "chat",
+  promptProfiles = [],
+}: ChatInputProps) {
+  const profiles = promptProfiles.length > 0 ? promptProfiles : FALLBACK_PROFILES;
+
   const [message, setMessage] = useState("");
-  const [selectedTool, setSelectedTool] = useState(TOOL_KEYS[0]);
+  const [selectedProfileId, setSelectedProfileId] = useState(profiles[0]?.id ?? "default_balanced");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Performance: Auto-resize يقلل القفزات البصرية أثناء الكتابة
+  useEffect(() => {
+    if (!profiles.some((profile) => profile.id === selectedProfileId)) {
+      setSelectedProfileId(profiles[0]?.id ?? "default_balanced");
+    }
+  }, [profiles, selectedProfileId]);
+
+  const selectedProfile =
+    profiles.find((profile) => profile.id === selectedProfileId) ?? profiles[0] ?? FALLBACK_PROFILES[0];
+
   const adjustHeight = useCallback(() => {
     const el = textareaRef.current;
     if (!el) return;
@@ -43,7 +86,7 @@ export function ChatInput({ onSend, isLoading, variant = "chat" }: ChatInputProp
 
   const handleSubmit = () => {
     if (!message.trim() || isLoading) return;
-    onSend(message.trim(), SYSTEM_PROMPTS[selectedTool]);
+    onSend(message.trim(), selectedProfile?.id);
     setMessage("");
     if (textareaRef.current) textareaRef.current.style.height = "auto";
   };
@@ -58,29 +101,30 @@ export function ChatInput({ onSend, isLoading, variant = "chat" }: ChatInputProp
   const isHero = variant === "hero";
 
   return (
-    <div className={cn("w-full px-4 relative z-10", isHero ? "pb-0" : "sticky bottom-0 pb-6 pt-2")}>
-      {/* Aesthetics: مساحة سلبية وظلال ناعمة بدلا من التحديد الحاد */}
-      <div className={cn("mx-auto", isHero ? "max-w-3xl" : "max-w-4xl")}>
+    <div className={cn("relative z-10 w-full", isHero ? "" : "sticky bottom-0 px-4 pb-2 pt-2 md:px-8")}>
+      <div className={cn("mx-auto", isHero ? "max-w-6xl" : "max-w-4xl")}>
         <div
           className={cn(
-            "relative group transition-all duration-500",
-            "bg-[#110e17]/80 backdrop-blur-xl border border-white/5", // Glassmorphism دقيق
-            isHero ? "rounded-[2rem] shadow-2xl shadow-purple-900/10" : "rounded-3xl shadow-lg",
-            "focus-within:border-white/15 focus-within:bg-[#110e17]/95"
+            "rork-panel group relative overflow-hidden backdrop-blur-xl transition-all duration-300",
+            isHero
+              ? "rounded-[2rem] shadow-xl shadow-black/10"
+              : "rounded-[1.65rem] shadow-lg shadow-black/10",
+            "focus-within:border-primary/45 focus-within:shadow-[0_20px_32px_-24px_hsl(var(--foreground)/0.7)]",
           )}
         >
-          <textarea
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-primary/12 via-transparent to-transparent" />
+          <Textarea
             ref={textareaRef}
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={isHero ? "بمَ تُفكر اليوم؟" : "اكتب لتبدأ النبض..."}
             rows={1}
-            dir="auto" // Accessibility: Auto يكتشف الاتجاه طبيعياً
+            dir="auto"
             className={cn(
-              "w-full bg-transparent text-foreground placeholder:text-foreground/40",
-              "resize-none outline-none font-medium tracking-wide",
-              isHero ? "px-6 pt-6 pb-20 text-lg rounded-[2rem]" : "px-5 pt-5 pb-16 text-base rounded-3xl"
+              "w-full resize-none rounded-none border-0 bg-transparent px-5 pb-3 pt-5 text-base leading-8 text-foreground placeholder:text-foreground/45",
+              "max-h-[220px] font-medium tracking-[0.01em] focus-visible:ring-0 focus-visible:ring-offset-0",
+              isHero ? "min-h-[132px] px-6 pb-4 pt-6 text-[1.06rem]" : "min-h-[88px]",
             )}
             aria-label="رسالة المستخدم"
             data-testid="input-chat-message"
@@ -88,42 +132,54 @@ export function ChatInput({ onSend, isLoading, variant = "chat" }: ChatInputProp
 
           <div
             className={cn(
-              "absolute left-4 right-4 flex items-center justify-between gap-3",
-              isHero ? "bottom-5" : "bottom-4"
+              "flex flex-wrap items-center justify-between gap-3 border-t border-border/75 px-4 py-3.5 md:px-5",
+              isHero && "px-5 py-4 md:px-6",
             )}
           >
-            <div className="flex items-center gap-2">
-              <button
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
                 aria-label="إرفاق ملف"
                 data-testid="button-attach"
-                className="flex items-center justify-center w-10 h-10 rounded-2xl text-foreground/40 transition-all hover:text-foreground hover:bg-white/10"
+                className="h-9 w-9 rounded-xl border-border/80 bg-background/45 text-foreground/50 hover:border-primary/35 hover:bg-background/80 hover:text-foreground"
               >
-                <Paperclip className="w-5 h-5" strokeWidth={1.5} />
-              </button>
+                <Paperclip className="h-[18px] w-[18px]" strokeWidth={1.7} />
+              </Button>
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button
-                    aria-label="تحديد الأداة"
-                    data-testid="dropdown-tool-trigger"
-                    className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-white/5 text-foreground/70 text-sm font-semibold transition-all hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/20"
+                  <Button
+                    type="button"
+                    variant="outline"
+                    aria-label="تحديد نمط الرد"
+                    data-testid="dropdown-prompt-profile-trigger"
+                    className="h-9 gap-2 rounded-xl border-border/80 bg-background/45 px-3.5 text-sm font-semibold text-foreground/75 hover:border-primary/35 hover:bg-background/80 hover:text-foreground"
                   >
-                    <span>{selectedTool}</span>
-                    <ChevronDown className="w-4 h-4 opacity-50" strokeWidth={2} />
-                  </button>
+                    <span>{selectedProfile?.label ?? "محادثة ذكية"}</span>
+                    <ChevronDown className="h-4 w-4 opacity-55" strokeWidth={2} />
+                  </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="min-w-[180px] rounded-2xl bg-[#110e17] border-white/10 backdrop-blur-xl">
-                  {TOOL_KEYS.map((tool) => (
+                <DropdownMenuContent
+                  align="start"
+                  className="min-w-[220px] rounded-xl border-border/80 bg-popover/95 p-1.5 backdrop-blur-xl"
+                >
+                  {profiles.map((profile) => (
                     <DropdownMenuItem
-                      key={tool}
-                      onClick={() => setSelectedTool(tool)}
-                      data-testid={`dropdown-item-${tool}`}
+                      key={profile.id}
+                      onClick={() => setSelectedProfileId(profile.id)}
+                      data-testid={`dropdown-item-profile-${profile.id}`}
                       className={cn(
-                        "cursor-pointer text-sm font-medium py-2.5 rounded-xl transition-colors",
-                        selectedTool === tool && "bg-primary/20 text-primary focus:bg-primary/30"
+                        "cursor-pointer rounded-lg py-2 text-sm font-medium transition-colors",
+                        selectedProfileId === profile.id &&
+                          "bg-primary/15 text-primary focus:bg-primary/20",
                       )}
                     >
-                      {tool}
+                      <div className="flex flex-col gap-0.5">
+                        <span>{profile.label}</span>
+                        <span className="text-[11px] text-foreground/45">{profile.description}</span>
+                      </div>
                     </DropdownMenuItem>
                   ))}
                 </DropdownMenuContent>
@@ -131,28 +187,37 @@ export function ChatInput({ onSend, isLoading, variant = "chat" }: ChatInputProp
             </div>
 
             <div className="flex items-center gap-2">
-              <button
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
                 aria-label="إدخال صوتي"
                 data-testid="button-mic"
-                className="flex items-center justify-center w-10 h-10 rounded-2xl text-foreground/40 transition-all hover:text-foreground hover:bg-white/10"
+                className="h-9 w-9 rounded-xl border-border/80 bg-background/45 text-foreground/50 hover:border-primary/35 hover:bg-background/80 hover:text-foreground"
               >
-                <Mic className="w-5 h-5" strokeWidth={1.5} />
-              </button>
-              <button
+                <Mic className="h-[18px] w-[18px]" strokeWidth={1.7} />
+              </Button>
+              <Button
+                type="button"
                 aria-label="إرسال"
                 data-testid="button-send-message"
                 className={cn(
-                  "flex items-center justify-center w-10 h-10 rounded-2xl transition-all duration-300",
+                  "h-9 w-9 rounded-xl border transition-all duration-300",
                   message.trim()
-                    ? "bg-foreground text-background scale-100 shadow-[0_0_15px_rgba(255,255,255,0.2)] hover:scale-105 active:scale-95 cursor-pointer"
-                    : "bg-white/5 text-foreground/20 scale-95 cursor-not-allowed"
+                    ? "rork-cta animate-[rorkCtaPulse_2.4s_ease-in-out_infinite] hover:-translate-y-0.5"
+                    : "border-border/80 bg-background/45 text-foreground/25",
                 )}
                 onClick={handleSubmit}
                 disabled={!message.trim() || isLoading}
               >
-                {/* Motion: حيوية في الرموز */}
-                <Send className={cn("w-5 h-5 rotate-180", message.trim() && "animate-in slide-in-from-bottom-2")} strokeWidth={2} />
-              </button>
+                <Send
+                  className={cn(
+                    "h-[18px] w-[18px] rotate-180",
+                    message.trim() && "animate-in slide-in-from-bottom-2",
+                  )}
+                  strokeWidth={2}
+                />
+              </Button>
             </div>
           </div>
         </div>

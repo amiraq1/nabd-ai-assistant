@@ -1,4 +1,5 @@
 import { Menu } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface NabdHeaderProps {
   onToggleSidebar: () => void;
@@ -8,31 +9,34 @@ interface NabdHeaderProps {
 export function NabdHeader({ onToggleSidebar, conversationTitle }: NabdHeaderProps) {
   return (
     <header
-      className="sticky top-0 z-30 flex items-center justify-between gap-2 px-5 py-3.5 border-b border-white/5"
-      style={{ background: "#0a0a0a" }}
+      className="sticky top-0 z-30 border-b border-border/80 bg-background/88 backdrop-blur-xl"
       data-testid="header"
     >
-      <div className="flex items-center gap-3">
-        <div className="flex items-center gap-2.5">
-          <div className="w-2 h-2 rounded-full bg-white" />
-          <h1 className="text-lg font-bold text-white tracking-tight">
-            نبض
-          </h1>
+      <div className="mx-auto flex h-[4.25rem] w-full max-w-6xl items-center justify-between px-4 md:px-8">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="h-2 w-2 rounded-full bg-primary shadow-[0_0_0_5px_hsl(var(--primary)/0.15)]" />
+            <h1 className="font-serif text-3xl leading-none text-foreground">
+              نبضـ
+            </h1>
+          </div>
+          {conversationTitle && (
+            <span className="rork-chip truncate rounded-full px-3 py-1 text-sm font-medium max-w-[18rem]">
+              {conversationTitle}
+            </span>
+          )}
         </div>
-        {conversationTitle && (
-          <>
-            <span className="text-white/15">|</span>
-            <span className="text-sm text-white/40 truncate max-w-48">{conversationTitle}</span>
-          </>
-        )}
+
+        <Button
+          variant="outline"
+          size="icon"
+          className="h-10 w-10 rounded-2xl border-border/80 bg-card/60 text-foreground/70 hover-rise hover:text-foreground"
+          onClick={onToggleSidebar}
+          data-testid="button-toggle-sidebar"
+        >
+          <Menu className="h-5 w-5" />
+        </Button>
       </div>
-      <button
-        className="flex items-center justify-center w-9 h-9 rounded-xl text-white/50 transition-colors hover:text-white/80 hover:bg-white/5"
-        onClick={onToggleSidebar}
-        data-testid="button-toggle-sidebar"
-      >
-        <Menu className="w-5 h-5" />
-      </button>
     </header>
   );
 }

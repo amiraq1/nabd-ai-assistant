@@ -50,34 +50,36 @@ function ProgressItem({
         <span className="text-foreground/75">{label}</span>
         <span className="font-semibold text-foreground">{value}%</span>
       </div>
-      <Progress value={value} className="h-2.5 bg-white/10" />
+      <Progress value={value} className="h-2.5 bg-border/65" />
     </div>
   );
 }
 
 export default function UserPage() {
   return (
-    <div className="min-h-screen bg-background overflow-hidden relative" dir="rtl">
+    <div className="relative min-h-screen overflow-hidden bg-background" dir="rtl">
       <div
-        className="pointer-events-none absolute inset-0 opacity-[0.05] mix-blend-overlay"
+        className="pointer-events-none absolute inset-0 opacity-[0.12] mix-blend-screen"
         style={{
           backgroundImage:
-            'url("data:image/svg+xml,%3Csvg viewBox=%220 0 240 240%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22grain%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.9%22 numOctaves=%223%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23grain)%22/%3E%3C/svg%3E")',
+            "linear-gradient(to right, hsl(var(--foreground)/0.08) 1px, transparent 1px), linear-gradient(to bottom, hsl(var(--foreground)/0.08) 1px, transparent 1px)",
+          backgroundSize: "24px 24px",
         }}
       />
-      <div className="pointer-events-none absolute -top-40 left-1/4 h-[420px] w-[520px] rounded-full bg-primary/10 blur-[120px]" />
+      <div className="pointer-events-none absolute -top-28 right-1/4 h-[420px] w-[520px] rounded-full bg-accent/26 blur-[120px]" />
+      <div className="pointer-events-none absolute bottom-8 left-10 h-[280px] w-[280px] rounded-full bg-primary/24 blur-[100px]" />
 
       <main className="relative z-10 mx-auto max-w-6xl px-4 py-8 md:px-8 md:py-10">
         <header className="mb-8 flex flex-wrap items-center justify-between gap-4">
           <div className="space-y-1">
-            <h1 className="text-3xl md:text-4xl font-black tracking-tight text-foreground" data-testid="text-user-page-title">
+            <h1 className="font-serif text-5xl leading-none text-foreground md:text-6xl" data-testid="text-user-page-title">
               صفحة المستخدم
             </h1>
-            <p className="text-foreground/55">
+            <p className="text-foreground/62">
               نظرة سريعة على ملفك الشخصي، التقدم، والإجراءات السريعة.
             </p>
           </div>
-          <Button asChild variant="outline" className="border-white/15 bg-white/5 hover:bg-white/10">
+          <Button asChild variant="outline" className="rounded-2xl border-border/80 bg-card/70 hover:bg-card">
             <Link href="/" data-testid="link-back-home">
               <ArrowRight className="h-4 w-4" />
               العودة للمحادثات
@@ -86,33 +88,35 @@ export default function UserPage() {
         </header>
 
         <section className="grid gap-6 lg:grid-cols-[1.35fr_1fr]">
-          <Card className="border-white/10 bg-card/80 backdrop-blur-xl shadow-xl shadow-black/25">
+          <Card className="border-border/80 bg-card/80 shadow-xl shadow-black/10 backdrop-blur-xl">
             <CardHeader className="pb-5">
               <div className="flex flex-wrap items-start justify-between gap-5">
                 <div className="flex items-center gap-4">
-                  <Avatar className="h-20 w-20 ring-2 ring-primary/35">
+                  <Avatar className="h-20 w-20 ring-2 ring-primary/35 ring-offset-2 ring-offset-background">
                     <AvatarImage
                       alt="صورة المستخدم"
                       src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&h=200&fit=crop"
                     />
-                    <AvatarFallback className="bg-primary/20 text-primary-foreground font-bold">
+                    <AvatarFallback className="bg-primary/20 font-bold text-primary">
                       لع
                     </AvatarFallback>
                   </Avatar>
                   <div className="space-y-2">
-                    <CardTitle className="text-2xl md:text-3xl font-black tracking-tight">
+                    <CardTitle className="text-2xl font-black tracking-tight md:text-3xl">
                       ليان العمري
                     </CardTitle>
-                    <CardDescription className="text-base text-foreground/60">
+                    <CardDescription className="text-base text-foreground/62">
                       مهندسة منتجات رقمية تركز على تجربة المستخدم العربية.
                     </CardDescription>
                     <div className="flex flex-wrap items-center gap-2">
-                      <Badge className="bg-primary/90 text-primary-foreground">عضو نشط</Badge>
-                      <Badge variant="secondary">خطة احترافية</Badge>
+                      <Badge className="rounded-full bg-primary text-primary-foreground">عضو نشط</Badge>
+                      <Badge variant="secondary" className="rounded-full border border-secondary/30 bg-secondary/[0.12] text-secondary">
+                        خطة احترافية
+                      </Badge>
                     </div>
                   </div>
                 </div>
-                <Badge variant="outline" className="border-primary/30 bg-primary/10 px-3 py-1 text-primary">
+                <Badge variant="outline" className="rounded-full border-primary/30 bg-primary/10 px-3 py-1 text-primary">
                   تقييم الجودة: 98/100
                 </Badge>
               </div>
@@ -123,27 +127,27 @@ export default function UserPage() {
                 {stats.map((stat) => (
                   <div
                     key={stat.label}
-                    className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3"
+                    className="rounded-2xl border border-border/75 bg-background/55 px-4 py-3"
                   >
-                    <p className="text-xs text-foreground/55">{stat.label}</p>
+                    <p className="text-xs text-foreground/58">{stat.label}</p>
                     <p className="mt-1 text-2xl font-black tracking-tight text-foreground">{stat.value}</p>
                   </div>
                 ))}
               </div>
 
-              <Separator className="bg-white/10" />
+              <Separator className="bg-border/70" />
 
               <div className="space-y-3">
                 <h2 className="text-lg font-bold">بيانات التواصل</h2>
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                  <div className="rounded-2xl border border-border/75 bg-background/55 p-4">
                     <div className="flex items-center gap-2 text-foreground/70">
                       <Mail className="h-4 w-4" />
                       <span className="text-sm">البريد الإلكتروني</span>
                     </div>
                     <p className="mt-2 text-sm font-medium">layan.omari@nabd.ai</p>
                   </div>
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                  <div className="rounded-2xl border border-border/75 bg-background/55 p-4">
                     <div className="flex items-center gap-2 text-foreground/70">
                       <Phone className="h-4 w-4" />
                       <span className="text-sm">رقم الجوال</span>
@@ -155,15 +159,15 @@ export default function UserPage() {
             </CardContent>
 
             <CardFooter className="justify-end gap-3">
-              <Button variant="outline" className="border-white/15 bg-transparent hover:bg-white/10">
+              <Button variant="outline" className="rounded-2xl border-border/80 bg-transparent hover:bg-card">
                 تحديث الصورة
               </Button>
-              <Button>حفظ التغييرات</Button>
+              <Button className="rounded-2xl">حفظ التغييرات</Button>
             </CardFooter>
           </Card>
 
           <div className="space-y-6">
-            <Card className="border-white/10 bg-card/80 backdrop-blur-xl">
+            <Card className="border-border/80 bg-card/80 backdrop-blur-xl">
               <CardHeader>
                 <CardTitle className="text-xl">مؤشرات الحساب</CardTitle>
                 <CardDescription>تقدم إعداد الحساب وجودة الاستخدام خلال الشهر الحالي.</CardDescription>
@@ -175,39 +179,39 @@ export default function UserPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-white/10 bg-card/80 backdrop-blur-xl">
+            <Card className="border-border/80 bg-card/80 backdrop-blur-xl">
               <CardHeader>
                 <CardTitle className="text-xl">مجالات الاستخدام</CardTitle>
                 <CardDescription>المهام الأكثر نشاطًا في حسابك.</CardDescription>
               </CardHeader>
               <CardContent className="flex flex-wrap gap-2">
                 {skillTags.map((tag) => (
-                  <Badge key={tag} variant="outline" className="border-white/15 bg-white/[0.03] px-3 py-1">
+                  <Badge key={tag} variant="outline" className="rounded-full border-border/75 bg-background/55 px-3 py-1">
                     {tag}
                   </Badge>
                 ))}
               </CardContent>
             </Card>
 
-            <Card className="border-white/10 bg-card/80 backdrop-blur-xl">
+            <Card className="border-border/80 bg-card/80 backdrop-blur-xl">
               <CardHeader>
                 <CardTitle className="text-xl">إجراءات سريعة</CardTitle>
                 <CardDescription>اختصارات للمهام اليومية.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-2">
-                <Button variant="outline" className="w-full justify-start border-white/15 bg-transparent hover:bg-white/10">
+                <Button variant="outline" className="w-full justify-start rounded-xl border-border/75 bg-transparent hover:bg-card">
                   <Sparkles className="h-4 w-4" />
                   توليد موجز يومي
                 </Button>
-                <Button variant="outline" className="w-full justify-start border-white/15 bg-transparent hover:bg-white/10">
+                <Button variant="outline" className="w-full justify-start rounded-xl border-border/75 bg-transparent hover:bg-card">
                   <BrainCircuit className="h-4 w-4" />
                   تحسين أسلوب الرد
                 </Button>
-                <Button variant="outline" className="w-full justify-start border-white/15 bg-transparent hover:bg-white/10">
+                <Button variant="outline" className="w-full justify-start rounded-xl border-border/75 bg-transparent hover:bg-card">
                   <BookOpenText className="h-4 w-4" />
                   تصدير سجل التعلم
                 </Button>
-                <Button variant="outline" className="w-full justify-start border-white/15 bg-transparent hover:bg-white/10">
+                <Button variant="outline" className="w-full justify-start rounded-xl border-border/75 bg-transparent hover:bg-card">
                   <CalendarClock className="h-4 w-4" />
                   جدولة تقرير أسبوعي
                 </Button>

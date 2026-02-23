@@ -1,0 +1,30 @@
+{
+  "id": "ip_geolocation",
+  "name": "الموقع عبر IP",
+  "description": "تحديد الموقع الجغرافي والمنطقة الزمنية بناءً على عنوان IP.",
+  "category": "geo",
+  "version": "1.0.0",
+  "handler": "ip_geolocation",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "ip": {
+        "type": "string",
+        "description": "عنوان IP اختياري؛ إذا لم يُرسل سيتم استخدام IP الحالي"
+      }
+    },
+    "required": [],
+    "additionalProperties": false
+  },
+  "planner": {
+    "keywords": ["ip", "عنوان ip", "الاي بي", "موقعي", "موقعي", "geolocation"],
+    "patterns": ["\\bip\\b", "(?:عنوان\\s*ip|موقعي|موقعي|الاي بي)", "\\bgeo(location)?\\b"],
+    "extractor": "ip",
+    "objective": "تحديد الموقع والمنطقة الزمنية بناءً على عنوان IP.",
+    "priority": 24
+  },
+  "samplePrompts": [
+    "حدّد موقعي عبر عنوان IP",
+    "اعطني معلومات هذا الـ IP: 8.8.8.8"
+  ]
+}

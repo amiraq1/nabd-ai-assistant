@@ -1,0 +1,30 @@
+{
+  "id": "web_search",
+  "name": "البحث المعرفي",
+  "description": "بحث سريع في ويكيبيديا وإرجاع خلاصة وروابط.",
+  "category": "knowledge",
+  "version": "1.0.0",
+  "handler": "web_search",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "عبارة البحث"
+      }
+    },
+    "required": ["query"],
+    "additionalProperties": false
+  },
+  "planner": {
+    "keywords": ["ابحث", "بحث", "معلومات", "من هو", "ما هو", "search", "wiki", "wikipedia"],
+    "patterns": ["(?:ابحث|بحث|معلومات عن)", "\\b(search|wikipedia|wiki)\\b"],
+    "extractor": "query",
+    "objective": "تنفيذ بحث معرفي وإرجاع مصادر أولية موجزة.",
+    "priority": 25
+  },
+  "samplePrompts": [
+    "ابحث عن ابن الهيثم",
+    "ما هي تقنية RAG؟"
+  ]
+}
