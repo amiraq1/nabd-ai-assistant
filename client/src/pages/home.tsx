@@ -5,7 +5,6 @@ import { NabdSidebar } from "@/components/nabd-sidebar";
 import { NabdHeader } from "@/components/nabd-header";
 import { ChatInput } from "@/components/chat-input";
 import { ChatMessages } from "@/components/chat-messages";
-import { BentoGrid } from "@/components/bento-grid";
 import type { Conversation, Message } from "@shared/schema";
 
 interface SkillSummary {
@@ -53,75 +52,20 @@ const HeroSection = memo(
   }) => (
     <div className="flex-1 overflow-y-auto px-4 py-7 md:px-8 md:py-10">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
-        <section className="hero-signal hero-surface rork-panel-strong grid gap-8 rounded-[2rem] p-6 backdrop-blur-md md:grid-cols-[1.22fr_0.78fr] md:p-10">
-          <div className="space-y-6">
-            <div className="rork-chip inline-flex items-center rounded-full px-4 py-2 text-xs font-semibold">
-              مساعدك المرجعي، جاهز للتفكير.
-            </div>
-            <h2 className="hero-brand-title" data-testid="text-hero-title">
-              نبضـ.
-            </h2>
-            <p className="hero-brand-subtitle" data-testid="text-hero-subtitle">
-              صياغة أدق، تنظيم أعمق، وتنفيذ أسرع.
-              <br />
-              <span className="hero-brand-focus">كل سؤال يتحول إلى قرار عملي.</span>
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {QUICK_STARTS.map((prompt) => (
-                <button
-                  key={prompt}
-                  onClick={() => onSend(prompt)}
-                  className="rork-chip rounded-2xl px-3.5 py-2 text-sm"
-                  data-testid={`button-quick-start-${prompt}`}
-                >
-                  {prompt}
-                </button>
-              ))}
-            </div>
-            {skills.length > 0 && (
-              <div className="flex flex-wrap gap-2 pt-1">
-                {skills.slice(0, 5).map((skill) => (
-                  <button
-                    key={skill.id}
-                    onClick={() =>
-                      onSend(
-                        skill.samplePrompts?.[0] ??
-                          `استخدم مهارة ${skill.name} لحل هذا الطلب.`,
-                      )
-                    }
-                    className="rork-chip rounded-full px-3 py-1.5 text-xs"
-                    data-testid={`button-skill-chip-${skill.id}`}
-                  >
-                    {skill.name}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="grid gap-3 self-end md:pb-1">
-            <div className="hero-chip hover-rise rounded-3xl p-4">
-              <p className="text-xs font-semibold text-foreground/50">نمط العمل</p>
-              <p className="mt-1 text-base font-semibold text-foreground">تفكير منطقي ثم إجابة مباشرة</p>
-            </div>
-            <div className="hero-chip hover-rise rounded-3xl p-4">
-              <p className="text-xs font-semibold text-foreground/50">الدقة السياقية</p>
-              <p className="mt-1 text-base font-semibold text-foreground">يربط طلبك بالمعلومة الأهم دون ضجيج</p>
-            </div>
-            <div className="hero-chip hover-rise rounded-3xl p-4">
-              <p className="text-xs font-semibold text-foreground/50">زمن الوصول</p>
-              <p className="mt-1 text-base font-semibold text-foreground">واجهة مبسطة بتفاعل سريع ومقروئية عالية</p>
-            </div>
-          </div>
-        </section>
-
+        <div className="flex flex-col items-center gap-2 pt-10 pb-2 text-center">
+          <h1 className="hero-brand-title" data-testid="text-hero-title">
+            نبضـ
+          </h1>
+          <p className="text-base font-medium text-foreground/50 tracking-wide">
+            ذكاء بلا ضجيج.
+          </p>
+        </div>
         <ChatInput
           onSend={onSend}
           isLoading={isLoading}
           variant="hero"
           promptProfiles={promptProfiles}
         />
-        <BentoGrid onSelectTool={(prompt) => onSend(prompt)} skills={skills} />
       </div>
     </div>
   ),
@@ -242,14 +186,6 @@ export default function Home() {
         ) : (
           <div className="relative flex w-full min-h-0 flex-1 animate-in fade-in slide-in-from-bottom-4 duration-500 flex-col">
             <ChatMessages messages={messages} isLoading={sendMessage.isPending} />
-            <div className="relative w-full pb-5 pt-2">
-              <ChatInput
-                onSend={handleSend}
-                isLoading={sendMessage.isPending}
-                variant="chat"
-                promptProfiles={promptProfiles}
-              />
-            </div>
           </div>
         )}
       </div>

@@ -1,3 +1,6 @@
+@import "@fontsource-variable/cairo-play";
+@import "@fontsource-variable/alexandria";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -43,7 +46,7 @@
   --chart-4: 46 96% 53%;
   --chart-5: 334 80% 56%;
   --font-sans: "Alexandria", sans-serif;
-  --font-serif: "Lalezar", cursive;
+  --font-serif: "Cairo Play", sans-serif;
   --font-mono: "Alexandria", monospace;
   --radius: 1rem;
   --shadow-2xs: 0px 1px 0px 0px hsl(0 0% 0% / 0.3);
@@ -203,6 +206,7 @@
 }
 
 @keyframes nabdFocusPulse {
+
   0%,
   100% {
     opacity: 0.78;
@@ -233,6 +237,7 @@
 }
 
 @keyframes rorkCtaPulse {
+
   0%,
   100% {
     box-shadow: 0 0 0 0 hsl(var(--primary) / 0);
@@ -296,10 +301,10 @@
 
   .hero-brand-title {
     font-family: var(--font-serif);
-    font-weight: 400;
+    font-weight: 800;
     font-size: clamp(4.1rem, 14vw, 10.5rem);
     line-height: 0.88;
-    letter-spacing: 0.02em;
+    letter-spacing: -0.02em;
     color: hsl(var(--foreground));
     animation: nabdBrandFloat 7.5s ease-in-out infinite;
   }
@@ -358,13 +363,11 @@
     inset: 0;
     border-radius: inherit;
     pointer-events: none;
-    background: linear-gradient(
-      130deg,
-      hsl(var(--primary) / 0.15),
-      transparent 22%,
-      transparent 78%,
-      hsl(var(--primary) / 0.08)
-    );
+    background: linear-gradient(130deg,
+        hsl(var(--primary) / 0.15),
+        transparent 22%,
+        transparent 78%,
+        hsl(var(--primary) / 0.08));
     opacity: 0.75;
   }
 
@@ -380,6 +383,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+
   .hero-brand-title,
   .hero-brand-focus,
   .hero-signal::before,
