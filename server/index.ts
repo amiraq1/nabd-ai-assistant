@@ -35,10 +35,25 @@ export function log(message: string, source = "express") {
   console.log(`${formattedTime} [${source}] ${message}`);
 }
 
+function summarizeResponseBody(body: unknown): string {
+  if (body === null || body === undefined) return "empty";
+  if (typeof body === "string") {
+    return `string(len=${body.length})`;
+  }
+  if (Array.isArray(body)) {
+    return `array(len=${body.length})`;
+  }
+  if (typeof body === "object") {
+    const keys = Object.keys(body as Record<string, unknown>);
+    return `object(keys=${keys.slice(0, 8).join(",")})`;
+  }
+  return typeof body;
+}
+
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
+  let capturedJsonResponse: unknown;
 
   const originalResJson = res.json;
   res.json = function (bodyJson, ...args) {
@@ -50,8 +65,8 @@ app.use((req, res, next) => {
     const duration = Date.now() - start;
     if (path.startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+      if (capturedJsonResponse !== undefined) {
+        logLine += ` :: ${summarizeResponseBody(capturedJsonResponse)}`;
       }
 
       log(logLine);

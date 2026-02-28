@@ -4,6 +4,10 @@ import type { ModelToolDefinition } from "./tools.js";
 const AI_ENDPOINT =
   process.env.AI_ENDPOINT ?? "https://integrate.api.nvidia.com/v1/chat/completions";
 const AI_MODEL = process.env.AI_MODEL ?? "meta/llama-3.1-70b-instruct";
+const parsedTimeoutMs = Number.parseInt(process.env.AI_REQUEST_TIMEOUT_MS ?? "30000", 10);
+const MODEL_REQUEST_TIMEOUT_MS = Number.isFinite(parsedTimeoutMs) && parsedTimeoutMs > 0
+  ? parsedTimeoutMs
+  : 30_000;
 
 interface NvidiaToolCall {
   id?: string;
@@ -61,33 +65,42 @@ async function requestCompletion(
     stream: false,
   };
 
-  let response = await fetch(AI_ENDPOINT, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify(
-      tools && tools.length > 0
-        ? {
-            ...baseBody,
-            tools,
-            tool_choice: "auto",
-          }
-        : baseBody,
-    ),
-  });
+  const doRequest = async (body: unknown): Promise<Response> => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), MODEL_REQUEST_TIMEOUT_MS);
+    try {
+      return await fetch(AI_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        throw new Error(`AI request timeout after ${MODEL_REQUEST_TIMEOUT_MS}ms`);
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
+  };
+
+  let response = await doRequest(
+    tools && tools.length > 0
+      ? {
+          ...baseBody,
+          tools,
+          tool_choice: "auto",
+        }
+      : baseBody,
+  );
 
   // Some providers reject `tools`; retry once without tools to preserve compatibility.
   if (!response.ok && tools && tools.length > 0) {
-    response = await fetch(AI_ENDPOINT, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify(baseBody),
-    });
+    response = await doRequest(baseBody);
   }
 
   if (!response.ok) {

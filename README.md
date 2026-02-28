@@ -58,6 +58,7 @@ Set the following variables before running:
 - `NVIDIA_API_KEY`: API key for NVIDIA model inference.
 - `AI_ENDPOINT` (optional): override model endpoint.
 - `AI_MODEL` (optional): override default model.
+- `AI_REQUEST_TIMEOUT_MS` (optional): timeout for model requests (default 30000 ms).
 - `NEWS_API_KEY` (optional): required for the `news_headlines` skill.
 - `IPSTACK_API_KEY` (optional): enables IPstack provider for `ip_geolocation`.
 - `NABD_SKILLS_DIR` (optional): override skills directory path (default `skills`).
@@ -69,9 +70,17 @@ Set the following variables before running:
 
 ```bash
 npm install
+npm run db:push
+npm run lint
+npm run test
 npm run check
 npm run dev
 ```
+
+## Data Isolation
+
+- Conversations are isolated per browser session using an HttpOnly cookie (`nabd_uid`).
+- API routes now enforce conversation ownership checks before listing, reading, deleting, or adding messages.
 
 ## Vercel Deployment (Frontend + API)
 

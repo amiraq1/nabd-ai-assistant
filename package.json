@@ -10,7 +10,9 @@
     "dev": "cross-env NODE_ENV=development tsx server/index.ts",
     "build": "tsx script/build.ts",
     "start": "cross-env NODE_ENV=production node dist/index.cjs",
+    "lint": "tsc --noEmit",
     "check": "tsc",
+    "test": "npm exec tsx -- --test server/auth/session-user.test.ts",
     "db:push": "drizzle-kit push"
   },
   "dependencies": {
@@ -86,7 +88,6 @@
     "@replit/vite-plugin-dev-banner": "^0.1.1",
     "@replit/vite-plugin-runtime-error-modal": "^0.0.3",
     "@tailwindcss/typography": "^0.5.15",
-    "@tailwindcss/vite": "^4.1.18",
     "@types/connect-pg-simple": "^7.0.3",
     "@types/express": "^5.0.0",
     "@types/express-session": "^1.18.0",

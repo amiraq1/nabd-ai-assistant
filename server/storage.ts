@@ -10,18 +10,18 @@ import {
   messages,
 } from "../shared/schema.js";
 import { db } from "./db.js";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
-  getConversations(): Promise<Conversation[]>;
-  getConversation(id: string): Promise<Conversation | undefined>;
+  getConversations(userId: string): Promise<Conversation[]>;
+  getConversation(id: string, userId: string): Promise<Conversation | undefined>;
   createConversation(conv: InsertConversation): Promise<Conversation>;
-  deleteConversation(id: string): Promise<void>;
-  getMessages(conversationId: string): Promise<Message[]>;
+  deleteConversation(id: string, userId: string): Promise<boolean>;
+  getMessages(conversationId: string, userId: string): Promise<Message[]>;
   createMessage(msg: InsertMessage): Promise<Message>;
 }
 
@@ -41,12 +41,19 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async getConversations(): Promise<Conversation[]> {
-    return db.select().from(conversations).orderBy(desc(conversations.createdAt));
+  async getConversations(userId: string): Promise<Conversation[]> {
+    return db
+      .select()
+      .from(conversations)
+      .where(eq(conversations.userId, userId))
+      .orderBy(desc(conversations.createdAt));
   }
 
-  async getConversation(id: string): Promise<Conversation | undefined> {
-    const [conv] = await db.select().from(conversations).where(eq(conversations.id, id));
+  async getConversation(id: string, userId: string): Promise<Conversation | undefined> {
+    const [conv] = await db
+      .select()
+      .from(conversations)
+      .where(and(eq(conversations.id, id), eq(conversations.userId, userId)));
     return conv;
   }
 
@@ -55,12 +62,23 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
-  async deleteConversation(id: string): Promise<void> {
-    await db.delete(messages).where(eq(messages.conversationId, id));
-    await db.delete(conversations).where(eq(conversations.id, id));
+  async deleteConversation(id: string, userId: string): Promise<boolean> {
+    const [deletedConversation] = await db
+      .delete(conversations)
+      .where(and(eq(conversations.id, id), eq(conversations.userId, userId)))
+      .returning({ id: conversations.id });
+    return Boolean(deletedConversation);
   }
 
-  async getMessages(conversationId: string): Promise<Message[]> {
+  async getMessages(conversationId: string, userId: string): Promise<Message[]> {
+    const [conv] = await db
+      .select({ id: conversations.id })
+      .from(conversations)
+      .where(
+        and(eq(conversations.id, conversationId), eq(conversations.userId, userId)),
+      );
+    if (!conv) return [];
+
     return db
       .select()
       .from(messages)
@@ -96,14 +114,18 @@ export class MemStorage implements IStorage {
     return user;
   }
 
-  async getConversations(): Promise<Conversation[]> {
+  async getConversations(userId: string): Promise<Conversation[]> {
     return Array.from(this.conversations.values()).sort(
       (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
+    ).filter(
+      (conversation) => conversation.userId === userId,
     );
   }
 
-  async getConversation(id: string): Promise<Conversation | undefined> {
-    return this.conversations.get(id);
+  async getConversation(id: string, userId: string): Promise<Conversation | undefined> {
+    const conversation = this.conversations.get(id);
+    if (!conversation || conversation.userId !== userId) return undefined;
+    return conversation;
   }
 
   async createConversation(conv: InsertConversation): Promise<Conversation> {
@@ -117,16 +139,23 @@ export class MemStorage implements IStorage {
     return conversation;
   }
 
-  async deleteConversation(id: string): Promise<void> {
+  async deleteConversation(id: string, userId: string): Promise<boolean> {
+    const conversation = await this.getConversation(id, userId);
+    if (!conversation) return false;
+
     this.conversations.delete(id);
     for (const [msgId, msg] of Array.from(this.messages.entries())) {
       if (msg.conversationId === id) {
         this.messages.delete(msgId);
       }
     }
+    return true;
   }
 
-  async getMessages(conversationId: string): Promise<Message[]> {
+  async getMessages(conversationId: string, userId: string): Promise<Message[]> {
+    const conversation = await this.getConversation(conversationId, userId);
+    if (!conversation) return [];
+
     return Array.from(this.messages.values())
       .filter((msg) => msg.conversationId === conversationId)
       .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());

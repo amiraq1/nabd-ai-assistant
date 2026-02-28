@@ -377,7 +377,7 @@ async function ipGeolocationHandler(input: Record<string, unknown>): Promise<Ski
   if (ipstackKey) {
     try {
       const ipstackUrl =
-        `http://api.ipstack.com/${encodeURIComponent(ip ?? "check")}` +
+        `https://api.ipstack.com/${encodeURIComponent(ip ?? "check")}` +
         `?access_key=${encodeURIComponent(ipstackKey)}`;
       const data = await fetchJson<IpStackResponse>(ipstackUrl);
       if (data.country_name || data.city || data.time_zone?.id) {

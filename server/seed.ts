@@ -1,12 +1,22 @@
 import { storage } from "./storage.js";
 
 export async function seed() {
-  const existing = await storage.getConversations();
+  const demoUserId = "seed_demo_user";
+  const existing = await storage.getConversations(demoUserId);
   if (existing.length > 0) return;
 
-  const conv1 = await storage.createConversation({ title: "كيف أتعلم البرمجة؟" });
-  const conv2 = await storage.createConversation({ title: "ترجمة مقال إلى العربية" });
-  const conv3 = await storage.createConversation({ title: "أفكار لمشروع تخرج" });
+  const conv1 = await storage.createConversation({
+    userId: demoUserId,
+    title: "كيف أتعلم البرمجة؟",
+  });
+  const conv2 = await storage.createConversation({
+    userId: demoUserId,
+    title: "ترجمة مقال إلى العربية",
+  });
+  const conv3 = await storage.createConversation({
+    userId: demoUserId,
+    title: "أفكار لمشروع تخرج",
+  });
 
   await storage.createMessage({
     conversationId: conv1.id,

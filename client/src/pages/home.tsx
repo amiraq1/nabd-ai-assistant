@@ -135,10 +135,11 @@ export default function Home() {
   const deleteConversation = useMutation({
     mutationFn: async (id: string) => {
       await apiRequest("DELETE", `/api/conversations/${id}`);
+      return id;
     },
-    onSuccess: () => {
+    onSuccess: (deletedId: string) => {
       queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
-      if (activeConversationId) {
+      if (activeConversationId === deletedId) {
         setActiveConversationId(null);
       }
     },
@@ -186,6 +187,12 @@ export default function Home() {
         ) : (
           <div className="relative flex w-full min-h-0 flex-1 animate-in fade-in slide-in-from-bottom-4 duration-500 flex-col">
             <ChatMessages messages={messages} isLoading={sendMessage.isPending} />
+            <ChatInput
+              onSend={handleSend}
+              isLoading={sendMessage.isPending || createConversation.isPending}
+              variant="chat"
+              promptProfiles={promptProfiles}
+            />
           </div>
         )}
       </div>

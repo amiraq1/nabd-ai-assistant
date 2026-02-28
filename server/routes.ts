@@ -24,6 +24,10 @@ import {
   listSkills,
   refreshSkills,
 } from "./skills/registry.js";
+import { resolveSessionUserId } from "./auth/session-user.js";
+
+const MAX_CONVERSATION_TITLE_CHARS = 120;
+const MAX_MESSAGE_CHARS = 10_000;
 
 export async function registerRoutes(
   httpServer: Server,
@@ -202,33 +206,71 @@ export async function registerRoutes(
   });
 
   app.get("/api/conversations", async (_req, res) => {
-    const convs = await storage.getConversations();
+    const userId = resolveSessionUserId(_req, res);
+    const convs = await storage.getConversations(userId);
     res.json(convs);
   });
 
   app.post("/api/conversations", async (req, res) => {
-    const { title } = req.body;
+    const userId = resolveSessionUserId(req, res);
+    const { title } = req.body ?? {};
     if (!title || typeof title !== "string") {
       return res.status(400).json({ message: "العنوان مطلوب" });
     }
-    const conv = await storage.createConversation({ title });
+
+    const normalizedTitle = title.trim();
+    if (!normalizedTitle) {
+      return res.status(400).json({ message: "العنوان لا يمكن أن يكون فارغاً" });
+    }
+    if (normalizedTitle.length > MAX_CONVERSATION_TITLE_CHARS) {
+      return res.status(400).json({
+        message: `العنوان طويل جدًا (الحد الأقصى ${MAX_CONVERSATION_TITLE_CHARS} حرفاً)`,
+      });
+    }
+
+    const conv = await storage.createConversation({ title: normalizedTitle, userId });
     res.json(conv);
   });
 
   app.delete("/api/conversations/:id", async (req, res) => {
-    await storage.deleteConversation(req.params.id);
+    const userId = resolveSessionUserId(req, res);
+    const deleted = await storage.deleteConversation(req.params.id, userId);
+    if (!deleted) {
+      return res.status(404).json({ message: "المحادثة غير موجودة" });
+    }
     res.json({ success: true });
   });
 
   app.get("/api/conversations/:id/messages", async (req, res) => {
-    const msgs = await storage.getMessages(req.params.id);
+    const userId = resolveSessionUserId(req, res);
+    const conversation = await storage.getConversation(req.params.id, userId);
+    if (!conversation) {
+      return res.status(404).json({ message: "المحادثة غير موجودة" });
+    }
+
+    const msgs = await storage.getMessages(req.params.id, userId);
     res.json(msgs);
   });
 
   app.post("/api/conversations/:id/messages", async (req, res) => {
-    const { content, role, systemPrompt, systemPromptId } = req.body;
+    const userId = resolveSessionUserId(req, res);
+    const { content, systemPrompt, systemPromptId } = req.body ?? {};
     if (!content || typeof content !== "string") {
       return res.status(400).json({ message: "المحتوى مطلوب" });
+    }
+    const normalizedContent = content.trim();
+    if (!normalizedContent) {
+      return res.status(400).json({ message: "المحتوى لا يمكن أن يكون فارغاً" });
+    }
+    if (normalizedContent.length > MAX_MESSAGE_CHARS) {
+      return res.status(400).json({
+        message: `المحتوى طويل جدًا (الحد الأقصى ${MAX_MESSAGE_CHARS} حرفاً)`,
+      });
+    }
+
+    const conversation = await storage.getConversation(req.params.id, userId);
+    if (!conversation) {
+      return res.status(404).json({ message: "المحادثة غير موجودة" });
     }
 
     let resolvedSystemPrompt: string | undefined;
@@ -248,18 +290,18 @@ export async function registerRoutes(
 
     const userMsg = await storage.createMessage({
       conversationId: req.params.id,
-      content,
-      role: role || "user",
+      content: normalizedContent,
+      role: "user",
     });
 
     try {
-      const previousMessages = await storage.getMessages(req.params.id);
+      const previousMessages = await storage.getMessages(req.params.id, userId);
       const history = previousMessages
         .filter((msg) => msg.id !== userMsg.id)
         .map((msg) => ({ role: msg.role, content: msg.content }));
 
       const result = await generateAssistantReply({
-        content,
+        content: normalizedContent,
         systemPrompt: resolvedSystemPrompt,
         history,
       });
