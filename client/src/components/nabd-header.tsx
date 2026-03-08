@@ -1,16 +1,18 @@
-import { Menu } from "lucide-react";
+import { Menu, PlugZap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface NabdHeaderProps {
   onToggleSidebar: () => void;
   conversationTitle?: string;
   connectionLabel?: string;
+  onDisconnectPhone?: () => void;
 }
 
 export function NabdHeader({
   onToggleSidebar,
   conversationTitle,
   connectionLabel,
+  onDisconnectPhone,
 }: NabdHeaderProps) {
   return (
     <header
@@ -37,15 +39,29 @@ export function NabdHeader({
           )}
         </div>
 
-        <Button
-          variant="outline"
-          size="icon"
-          className="h-10 w-10 rounded-2xl border-border/80 bg-card/60 text-foreground/70 hover-rise hover:text-foreground"
-          onClick={onToggleSidebar}
-          data-testid="button-toggle-sidebar"
-        >
-          <Menu className="h-5 w-5" />
-        </Button>
+        <div className="flex items-center gap-2">
+          {onDisconnectPhone && (
+            <Button
+              variant="outline"
+              type="button"
+              className="h-10 gap-2 rounded-2xl border-amber-500/25 bg-amber-500/10 px-3 text-xs font-semibold text-amber-200 hover:bg-amber-500/16 hover:text-amber-100"
+              onClick={onDisconnectPhone}
+              data-testid="button-disconnect-phone"
+            >
+              <PlugZap className="h-4 w-4" />
+              <span>Disconnect Phone</span>
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-10 w-10 rounded-2xl border-border/80 bg-card/60 text-foreground/70 hover-rise hover:text-foreground"
+            onClick={onToggleSidebar}
+            data-testid="button-toggle-sidebar"
+          >
+            <Menu className="h-5 w-5" />
+          </Button>
+        </div>
       </div>
     </header>
   );

@@ -4,7 +4,7 @@ const UNCERTAIN_PREFIX = "غير متأكد:";
 
 const FACTUAL_PROMPT_HINTS = [
   /(^|\s)(where|what is|who is|when|which|capital|population|history|city|country|province)(\s|$)/i,
-  /(اين|أين|ما هي|من هو|من هي|متى|كم|اين تقع|أين تقع|عاصمة|محافظة|مدينة|دولة|تاريخ|عدد السكان|معلومات)/i,
+  /(اين|أين|ما هي|ما هو|من هو|من هي|متى|كم|اين تقع|أين تقع|عاصمة|محافظة|مدينة|دولة|تاريخ|عدد السكان|معلومات)/i,
 ];
 
 const FACTUAL_RESPONSE_HINTS = [
@@ -15,7 +15,7 @@ const FACTUAL_RESPONSE_HINTS = [
 
 const HEDGING_HINTS = [
   /\b(i don't know|i am not sure|not certain|maybe|possibly|unclear)\b/i,
-  /(لا أعرف|غير متأكد|لست متأكدًا|لست متأكدا|ربما|قد يكون|غير واضح)/i,
+  /(لا أعرف|غير متأكد|لست متأكدًا|لست متاكدا|ربما|قد يكون|غير واضح)/i,
 ];
 
 const SUSPICIOUS_META_HINTS = [
@@ -26,6 +26,23 @@ const SUSPICIOUS_META_HINTS = [
   /لا تخترع حقائق/i,
   /إذا لم تكن واثق/i,
 ];
+
+const LOCATION_RESPONSE_HINTS = [
+  /\b(in|near|north|south|east|west|province|governorate|district|located)\b/i,
+  /(في|بمحافظة|محافظة|قضاء|منطقة|شمال|جنوب|شرق|غرب|قرب|ضمن|تقع|نينوى|الموصل|العراق)/i,
+];
+
+const DATE_RESPONSE_HINTS = [
+  /\b\d{4}\b/,
+  /(عام|سنة|القرن|هجري|ميلادي|date|year)/i,
+];
+
+const QUANTITY_RESPONSE_HINTS = [
+  /\b\d+(\.\d+)?\b/,
+  /(عدد|حوالي|تقريبا|تقريبًا|نحو|كيلومتر|كم|درجة|مليون|مليار|population|km|percent|٪)/i,
+];
+
+type FactualPromptKind = "location" | "identity" | "date" | "quantity" | "general";
 
 export type PhoneReplyConfidence = "high" | "medium" | "low";
 
@@ -60,13 +77,47 @@ const RAW_PHONE_MODEL =
 export const DIRECT_PHONE_MODE_ENABLED = RAW_PHONE_API_BASE.length > 0;
 export const DIRECT_PHONE_MODEL_NAME = RAW_PHONE_MODEL || "tinyllama";
 
+export function clearDirectPhoneRuntimeSettings(): void {
+  if (typeof window === "undefined") return;
+
+  window.localStorage.removeItem(PHONE_API_BASE_STORAGE_KEY);
+  window.localStorage.removeItem(PHONE_MODEL_STORAGE_KEY);
+}
+
 function isLikelyFactualPrompt(prompt: string): boolean {
   const normalizedPrompt = prompt.trim();
   return FACTUAL_PROMPT_HINTS.some((pattern) => pattern.test(normalizedPrompt));
 }
 
+function inferFactualPromptKind(prompt: string): FactualPromptKind {
+  if (/(where|اين تقع|أين تقع|اين|أين|located|location)/i.test(prompt)) {
+    return "location";
+  }
+
+  if (/(when|متى|تاريخ|سنة|عام|date|year)/i.test(prompt)) {
+    return "date";
+  }
+
+  if (/(كم|عدد|population|distance|price|سعر|عدد السكان|كم يبعد)/i.test(prompt)) {
+    return "quantity";
+  }
+
+  if (/(who is|what is|ما هو|ما هي|من هو|من هي)/i.test(prompt)) {
+    return "identity";
+  }
+
+  return "general";
+}
+
 function containsArabic(text: string): boolean {
   return /[\u0600-\u06FF]/.test(text);
+}
+
+function countMeaningfulWords(text: string): number {
+  return text
+    .split(/\s+/)
+    .map((part) => part.replace(/[^0-9A-Za-z\u0600-\u06FF]+/g, ""))
+    .filter(Boolean).length;
 }
 
 function buildGuardedPrompt(prompt: string, factualPrompt: boolean): string {
@@ -102,10 +153,7 @@ function extractAnswer(rawText: string): string {
   return trimmed;
 }
 
-function inferConfidence(
-  answer: string,
-  factualPrompt: boolean,
-): PhoneReplyConfidence {
+function inferConfidence(answer: string, factualPrompt: boolean): PhoneReplyConfidence {
   if (answer.startsWith(UNCERTAIN_PREFIX) || HEDGING_HINTS.some((pattern) => pattern.test(answer))) {
     return "low";
   }
@@ -117,15 +165,59 @@ function inferConfidence(
   return "high";
 }
 
+function hasExpectedFactualShape(answer: string, kind: FactualPromptKind): boolean {
+  switch (kind) {
+    case "location":
+      return LOCATION_RESPONSE_HINTS.some((pattern) => pattern.test(answer));
+    case "date":
+      return DATE_RESPONSE_HINTS.some((pattern) => pattern.test(answer));
+    case "quantity":
+      return QUANTITY_RESPONSE_HINTS.some((pattern) => pattern.test(answer));
+    default:
+      return FACTUAL_RESPONSE_HINTS.some((pattern) => pattern.test(answer));
+  }
+}
+
 function isSuspiciousAnswer(answer: string, prompt: string): boolean {
   const trimmed = answer.trim();
   if (!trimmed) return true;
+
+  if (trimmed.startsWith(UNCERTAIN_PREFIX) || HEDGING_HINTS.some((pattern) => pattern.test(trimmed))) {
+    return false;
+  }
 
   if (SUSPICIOUS_META_HINTS.some((pattern) => pattern.test(trimmed))) {
     return true;
   }
 
   if (containsArabic(prompt) && !containsArabic(trimmed) && /[A-Za-z]/.test(trimmed)) {
+    return true;
+  }
+
+  if (!isLikelyFactualPrompt(prompt)) {
+    return false;
+  }
+
+  const kind = inferFactualPromptKind(prompt);
+  const wordCount = countMeaningfulWords(trimmed);
+
+  if (wordCount <= 1) {
+    return true;
+  }
+
+  if (/[!?؟]$/.test(trimmed) && wordCount <= 3) {
+    return true;
+  }
+
+  if (kind === "location" && !hasExpectedFactualShape(trimmed, kind)) {
+    return true;
+  }
+
+  if ((kind === "date" || kind === "quantity") && !hasExpectedFactualShape(trimmed, kind)) {
+    return true;
+  }
+
+  if (kind === "general" && wordCount <= 2 && !hasExpectedFactualShape(trimmed, kind)) {
     return true;
   }
 

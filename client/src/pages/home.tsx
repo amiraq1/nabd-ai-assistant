@@ -2,6 +2,7 @@ import { useState, useCallback, memo, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import {
+  clearDirectPhoneRuntimeSettings,
   DIRECT_PHONE_MODE_ENABLED,
   DIRECT_PHONE_MODEL_NAME,
   formatDirectPhoneReplyForDisplay,
@@ -177,6 +178,15 @@ export default function Home() {
     setActiveConversationId(null);
   }, []);
 
+  const handleDisconnectPhone = useCallback(() => {
+    resetDirectConversation();
+    clearDirectPhoneRuntimeSettings();
+
+    if (typeof window !== "undefined") {
+      window.location.assign(`${window.location.origin}${window.location.pathname}`);
+    }
+  }, [resetDirectConversation]);
+
   const handleSend = useCallback(
     async (content: string, systemPromptId?: string) => {
       if (isDirectPhoneMode) {
@@ -256,6 +266,7 @@ export default function Home() {
           onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
           conversationTitle={activeConversation?.title}
           connectionLabel={isDirectPhoneMode ? `DIRECT ${DIRECT_PHONE_MODEL_NAME.toUpperCase()}` : undefined}
+          onDisconnectPhone={isDirectPhoneMode ? handleDisconnectPhone : undefined}
         />
 
         {!isInChat ? (
