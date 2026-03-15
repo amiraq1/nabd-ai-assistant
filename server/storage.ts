@@ -16,6 +16,7 @@ import {
   projectScreens,
 } from "../shared/schema.js";
 import { db } from "./db.js";
+import { hasDatabaseUrl } from "./database-url.js";
 import { eq, desc, and } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
@@ -34,7 +35,12 @@ export interface IStorage {
   createProject(project: InsertProject): Promise<Project>;
   ensureProject(userId: string, name: string, platform: Project["platform"]): Promise<Project>;
   createProjectScreen(screen: InsertProjectScreen): Promise<ProjectScreen>;
+  getProjectScreen(screenId: string): Promise<ProjectScreen | undefined>;
   getLatestProjectScreen(projectId: string): Promise<ProjectScreen | undefined>;
+  updateProjectScreenReactCode(
+    screenId: string,
+    reactCode: string,
+  ): Promise<ProjectScreen | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -166,12 +172,35 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
+  async getProjectScreen(screenId: string): Promise<ProjectScreen | undefined> {
+    const [screen] = await db
+      .select()
+      .from(projectScreens)
+      .where(eq(projectScreens.id, screenId));
+    return screen;
+  }
+
   async getLatestProjectScreen(projectId: string): Promise<ProjectScreen | undefined> {
     const [screen] = await db
       .select()
       .from(projectScreens)
       .where(eq(projectScreens.projectId, projectId))
       .orderBy(desc(projectScreens.updatedAt));
+    return screen;
+  }
+
+  async updateProjectScreenReactCode(
+    screenId: string,
+    reactCode: string,
+  ): Promise<ProjectScreen | undefined> {
+    const [screen] = await db
+      .update(projectScreens)
+      .set({
+        reactCode,
+        updatedAt: new Date(),
+      })
+      .where(eq(projectScreens.id, screenId))
+      .returning();
     return screen;
   }
 }
@@ -315,13 +344,35 @@ export class MemStorage implements IStorage {
     return createdScreen;
   }
 
+  async getProjectScreen(screenId: string): Promise<ProjectScreen | undefined> {
+    return this.projectScreens.get(screenId);
+  }
+
   async getLatestProjectScreen(projectId: string): Promise<ProjectScreen | undefined> {
     return Array.from(this.projectScreens.values())
       .filter((screen) => screen.projectId === projectId)
       .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())[0];
   }
+
+  async updateProjectScreenReactCode(
+    screenId: string,
+    reactCode: string,
+  ): Promise<ProjectScreen | undefined> {
+    const screen = this.projectScreens.get(screenId);
+    if (!screen) {
+      return undefined;
+    }
+
+    const updatedScreen: ProjectScreen = {
+      ...screen,
+      reactCode,
+      updatedAt: new Date(),
+    };
+    this.projectScreens.set(screenId, updatedScreen);
+    return updatedScreen;
+  }
 }
 
-export const storage = process.env.DATABASE_URL
+export const storage = hasDatabaseUrl()
   ? new DatabaseStorage()
   : new MemStorage();

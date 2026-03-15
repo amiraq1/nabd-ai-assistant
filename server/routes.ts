@@ -32,6 +32,8 @@ import {
   type UISchemaGeneratedEvent,
   type UIComponent,
 } from "../shared/ui-schema.js";
+import { generateReactCode } from "./utils/generate-react-code.js";
+import { registerProjectRoutes } from "./routes/projects.js";
 
 const MAX_CONVERSATION_TITLE_CHARS = 120;
 const MAX_MESSAGE_CHARS = 10_000;
@@ -108,6 +110,8 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  registerProjectRoutes(app);
+
   const isProduction = process.env.NODE_ENV === "production";
   const debugMode = !isProduction;
   const debugEndpointsEnabled =
@@ -337,6 +341,43 @@ export async function registerRoutes(
     } finally {
       clearTimeout(timeout);
     }
+  });
+
+  app.post("/api/export", (req, res) => {
+    const jsonSchema = req.body?.jsonSchema;
+    const screenId =
+      typeof req.body?.screenId === "string" && req.body.screenId.trim()
+        ? req.body.screenId.trim()
+        : undefined;
+
+    const resolveAndSend = async () => {
+      let storedScreen = screenId ? await storage.getProjectScreen(screenId) : undefined;
+
+      if (storedScreen?.reactCode?.trim()) {
+        res.type("text/plain; charset=utf-8");
+        return res.send(storedScreen.reactCode);
+      }
+
+      const sourceSchema = jsonSchema ?? storedScreen?.uiSchema;
+      if (sourceSchema === undefined) {
+        return res.status(400).json({ message: "jsonSchema or screenId is required" });
+      }
+
+      const reactCode = generateReactCode(sourceSchema);
+
+      if (screenId && storedScreen) {
+        storedScreen = await storage.updateProjectScreenReactCode(screenId, reactCode);
+      }
+
+      res.type("text/plain; charset=utf-8");
+      return res.send(storedScreen?.reactCode ?? reactCode);
+    };
+
+    resolveAndSend().catch((error) => {
+      const message =
+        error instanceof Error ? error.message : "Failed to generate React code.";
+      return res.status(400).json({ message });
+    });
   });
 
   app.get("/api/conversations", async (_req, res) => {
