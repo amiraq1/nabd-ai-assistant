@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
+import { STUDIO_PROMPT_SCENES, type StudioPromptScene } from "@/lib/studio-scenes";
 import { apiRequest } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 import type { LibraryCatalogStats } from "@shared/library-catalog";
@@ -63,14 +64,6 @@ interface StudioModule {
   tone: string;
 }
 
-interface PromptScene {
-  title: string;
-  label: string;
-  description: string;
-  prompt: string;
-  palette: string;
-}
-
 const CARD_THEMES = [
   {
     panel:
@@ -89,39 +82,6 @@ const CARD_THEMES = [
       "border-emerald-300/12 bg-[radial-gradient(circle_at_top_left,rgba(52,211,153,0.22),transparent_42%),linear-gradient(160deg,rgba(7,21,18,0.96),rgba(12,12,12,0.92))]",
     glow: "bg-emerald-400/25",
     chip: "border-emerald-300/14 bg-emerald-300/10 text-emerald-100/90",
-  },
-];
-
-const PROMPT_SCENES: PromptScene[] = [
-  {
-    title: "Retail Pulse",
-    label: "Luxury Commerce",
-    description:
-      "A premium analytics surface for product performance, inventory pressure, and VIP customer flows.",
-    prompt:
-      "Build a luxury retail analytics app with a product catalog, stock pressure alerts, VIP client CRM, and a responsive command dashboard.",
-    palette:
-      "border-amber-300/18 bg-[radial-gradient(circle_at_top_left,rgba(245,158,11,0.22),transparent_42%),linear-gradient(160deg,rgba(30,20,7,0.96),rgba(11,10,10,0.92))]",
-  },
-  {
-    title: "Clinic Quiet",
-    label: "Healthcare Ops",
-    description:
-      "A calm but precise patient operations layer with appointment orchestration, notes, and intake flow.",
-    prompt:
-      "Build a healthcare operations app with appointment scheduling, patient intake cards, clinician notes, billing status, and a clean responsive admin dashboard.",
-    palette:
-      "border-cyan-300/18 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.22),transparent_42%),linear-gradient(160deg,rgba(7,22,28,0.96),rgba(11,10,10,0.92))]",
-  },
-  {
-    title: "Archive Command",
-    label: "Knowledge Systems",
-    description:
-      "A serious archival interface for digital preservation, controlled circulation, and metadata-heavy retrieval.",
-    prompt:
-      "Build a digital archive management app with strict metadata cataloging, circulation tracking, preservation queues, and a responsive librarian dashboard.",
-    palette:
-      "border-emerald-300/18 bg-[radial-gradient(circle_at_top_left,rgba(52,211,153,0.22),transparent_42%),linear-gradient(160deg,rgba(8,23,18,0.96),rgba(11,10,10,0.92))]",
   },
 ];
 
@@ -286,7 +246,7 @@ function PromptSceneCard({
   scene,
   onLaunch,
 }: {
-  scene: PromptScene;
+  scene: StudioPromptScene;
   onLaunch: (prompt: string) => void;
 }) {
   return (
@@ -693,7 +653,7 @@ export default function Dashboard() {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              {PROMPT_SCENES.map((scene) => (
+              {STUDIO_PROMPT_SCENES.map((scene) => (
                 <PromptSceneCard key={scene.title} scene={scene} onLaunch={handleLaunchPromptScene} />
               ))}
             </CardContent>

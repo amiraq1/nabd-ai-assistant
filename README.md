@@ -52,34 +52,77 @@ The project now includes a practical agent architecture baseline:
 
 ## Environment Variables
 
-Set the following variables before running:
+Use `.env.example` as the canonical template.
 
-- `DATABASE_URL`: PostgreSQL connection string.
-- `NVIDIA_API_KEY`: API key for NVIDIA model inference.
+### Production secret loading
+
+Production should not rely on raw secrets inside `.env`. The server now supports:
+
+- `SECRETS_PROVIDER=env`: direct environment variables (local development only).
+- `SECRETS_PROVIDER=aws-secrets-manager`: load a JSON secret from AWS Secrets Manager via `AWS_SECRETS_MANAGER_SECRET_ID`.
+- `SECRETS_PROVIDER=vault`: load key/value pairs from HashiCorp Vault via `VAULT_KV_PATH` and either `VAULT_TOKEN` or AppRole credentials.
+
+The secret payload should contain the server-only keys you actually need, for example:
+
+```json
+{
+  "DATABASE_URL": "postgresql://...",
+  "OPENAI_API_KEY": "sk-...",
+  "SUPABASE_SERVICE_ROLE_KEY": "...",
+  "DEBUG_API_TOKEN": "..."
+}
+```
+
+### Server-only secrets
+
+- `DATABASE_URL`
+- `AI_API_KEY` or `NVIDIA_API_KEY`
+- `OPENAI_API_KEY`
+- `GEMINI_API_KEY`
+- `NEWS_API_KEY`
+- `IPSTACK_API_KEY`
+- `DEBUG_API_TOKEN`
+- `REDIS_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+### Non-secret runtime configuration
+
 - `AI_ENDPOINT` (optional): override model endpoint.
 - `AI_MODEL` (optional): override default model.
 - `AI_REQUEST_TIMEOUT_MS` (optional): timeout for model requests (default 30000 ms).
-- `NEWS_API_KEY` (optional): required for the `news_headlines` skill.
-- `IPSTACK_API_KEY` (optional): enables IPstack provider for `ip_geolocation`.
 - `NABD_SKILLS_DIR` (optional): override skills directory path (default `skills`).
 - `RAG_STORE_PATH` (optional): override persisted RAG store file path.
-- `DEBUG_API_TOKEN` (required if debug endpoints are enabled): token for debug endpoint auth.
 - `ENABLE_AI_DEBUG_ENDPOINTS` (optional): set `true` to enable debug endpoints in production.
-- `VITE_PHONE_API_BASE` (optional): when set, the frontend sends prompts directly from the browser to your phone's `/api/generate` endpoint instead of Nabd's conversation API.
-- `VITE_PHONE_MODEL` (optional): model name sent to the phone endpoint (default `tinyllama`).
 - `ENABLE_PHONE_PROXY` (optional): allows the phone proxy route in production. Development always allows it.
 - `PHONE_PROXY_TIMEOUT_MS` (optional): timeout for proxied phone requests (default `120000`).
+
+### Browser-exposed values
+
+Only values prefixed with `VITE_` can reach the browser. This project now fails fast if a `VITE_*` variable looks like a secret (`TOKEN`, `SECRET`, `API_KEY`, `SERVICE_ROLE`, etc.).
+
+- `VITE_PHONE_API_BASE` (optional): browser-visible phone endpoint base URL.
+- `VITE_PHONE_MODEL` (optional): browser-visible phone model name.
+- `SUPABASE_ANON_KEY`: public client key only; never place `SUPABASE_SERVICE_ROLE_KEY` in the browser.
 
 ## Development
 
 ```bash
 npm install
+npm run security:audit
 npm run db:push
 npm run lint
 npm run test
 npm run check
 npm run dev
 ```
+
+## Secret Hygiene
+
+- Run `npm run security:audit` before production deployments.
+- Rotate any exposed provider key immediately at the provider, then update the secret manager payload.
+- Prefer workload identity or short-lived credentials over long-lived root tokens for AWS/Vault access.
+- Never place service-role, private, or admin tokens in `VITE_*` variables or client code.
+- Operational policy lives in `docs/secrets-policy.md`.
 
 ### Direct Phone Mode
 

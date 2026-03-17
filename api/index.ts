@@ -1,7 +1,6 @@
 import express, { type Request, type Response, type NextFunction } from "express";
 import { createServer } from "http";
-import { registerRoutes } from "../server/routes.js";
-import { seed } from "../server/seed.js";
+import { bootstrapRuntime } from "../server/bootstrap.js";
 
 declare module "http" {
   interface IncomingMessage {
@@ -29,6 +28,12 @@ async function ensureInitialized() {
   if (initialized) return;
   if (!initPromise) {
     initPromise = (async () => {
+      await bootstrapRuntime();
+      const [{ registerRoutes }, { seed }] = await Promise.all([
+        import("../server/routes.js"),
+        import("../server/seed.js"),
+      ]);
+
       await seed().catch((err) => console.error("Seed error:", err));
       await registerRoutes(httpServer, app);
 

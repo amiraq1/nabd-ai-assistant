@@ -13,11 +13,13 @@
     "lint": "tsc --noEmit",
     "check": "tsc",
     "test": "npm exec tsx -- --test server/auth/session-user.test.ts",
+    "security:audit": "tsx script/audit-secrets.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx script/migrate.ts",
     "db:push": "drizzle-kit push"
   },
   "dependencies": {
+    "@aws-sdk/client-secrets-manager": "^3.1010.0",
     "@fontsource-variable/alexandria": "^5.2.8",
     "@fontsource-variable/cairo-play": "^5.2.9",
     "@hookform/resolvers": "^3.10.0",

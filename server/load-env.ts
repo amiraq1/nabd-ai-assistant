@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 
-function parseEnvFile(content: string): Record<string, string> {
+export function parseEnvFile(content: string): Record<string, string> {
   const out: Record<string, string> = {};
   const lines = content.split(/\r?\n/);
 

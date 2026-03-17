@@ -1,6 +1,17 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Copy, Download, LoaderCircle, Save, Smartphone, Sparkles } from "lucide-react";
+import {
+  Activity,
+  Building2,
+  Copy,
+  Download,
+  LibraryBig,
+  LoaderCircle,
+  Save,
+  Smartphone,
+  Sparkles,
+  type LucideIcon,
+} from "lucide-react";
 import { useLocation } from "wouter";
 import { ChatInput, type PromptProfileOption } from "@/components/chat-input";
 import { ChatMessages } from "@/components/chat-messages";
@@ -12,7 +23,9 @@ import {
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
 import { useToast } from "@/hooks/use-toast";
+import { STUDIO_PROMPT_SCENES, type StudioPromptScene } from "@/lib/studio-scenes";
 import { useAppBuilderWS } from "@/hooks/useAppBuilderWS";
+import { cn } from "@/lib/utils";
 import type { Message } from "@shared/schema";
 import type { UIComponent } from "@shared/ui-schema";
 
@@ -73,6 +86,102 @@ const WorkspaceStatus = memo(
 );
 
 WorkspaceStatus.displayName = "WorkspaceStatus";
+
+const WORKSPACE_SCENE_ICONS: Record<StudioPromptScene["id"], LucideIcon> = {
+  "retail-pulse": Building2,
+  "clinic-quiet": Activity,
+  "archive-command": LibraryBig,
+};
+
+function WorkspaceQuickStartCard({
+  scene,
+  disabled,
+  onLaunch,
+}: {
+  scene: StudioPromptScene;
+  disabled: boolean;
+  onLaunch: (scene: StudioPromptScene) => void;
+}) {
+  const Icon = WORKSPACE_SCENE_ICONS[scene.id];
+
+  return (
+    <button
+      type="button"
+      onClick={() => onLaunch(scene)}
+      disabled={disabled}
+      className={cn(
+        "group relative overflow-hidden rounded-[1.7rem] border p-4 text-left transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_24px_60px_-36px_hsl(var(--foreground)/0.85)] disabled:cursor-not-allowed disabled:opacity-55",
+        scene.palette,
+      )}
+    >
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(145deg,rgba(255,255,255,0.08),transparent_34%,transparent_72%,rgba(255,255,255,0.04))]" />
+      <div className="relative flex h-full flex-col gap-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="rounded-2xl border border-white/12 bg-white/10 p-3 text-white/80">
+            <Icon className="h-5 w-5" />
+          </div>
+          <span className="rounded-full border border-white/12 bg-white/10 px-3 py-1 text-[10px] uppercase tracking-[0.22em] text-white/70">
+            {scene.label}
+          </span>
+        </div>
+        <div>
+          <div className="text-lg font-semibold tracking-tight text-white">{scene.title}</div>
+          <p className="mt-2 text-sm leading-6 text-white/64">{scene.description}</p>
+        </div>
+        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-white/78">
+          Launch scene
+          <Sparkles className="h-3.5 w-3.5" />
+        </div>
+      </div>
+    </button>
+  );
+}
+
+function WorkspaceQuickStartRail({
+  disabled,
+  onLaunch,
+}: {
+  disabled: boolean;
+  onLaunch: (scene: StudioPromptScene) => void;
+}) {
+  return (
+    <div className="border-b border-border/70 px-5 py-5">
+      <div className="rounded-[1.9rem] border border-border/80 bg-background/55 p-4 shadow-[0_24px_60px_-42px_hsl(var(--foreground)/0.5)] backdrop-blur-xl">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="max-w-xl">
+            <div className="flex items-center gap-2 text-primary">
+              <Sparkles className="h-4 w-4" />
+              <span className="text-[11px] font-bold uppercase tracking-[0.2em]">
+                Scene ignition
+              </span>
+            </div>
+            <h2 className="mt-3 text-xl font-black tracking-tight text-foreground">
+              Start from a composed vibe instead of a blank prompt.
+            </h2>
+            <p className="mt-2 text-sm leading-7 text-foreground/60">
+              Each scene sends a fully formed direction into the builder and updates the live preview
+              as soon as the schema returns.
+            </p>
+          </div>
+          <span className="rounded-full border border-border/80 bg-background/60 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-foreground/55">
+            Prompt-first entry
+          </span>
+        </div>
+
+        <div className="mt-5 grid gap-3 xl:grid-cols-3">
+          {STUDIO_PROMPT_SCENES.map((scene) => (
+            <WorkspaceQuickStartCard
+              key={scene.id}
+              scene={scene}
+              disabled={disabled}
+              onLaunch={onLaunch}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const MobileFrame = memo(
   ({
@@ -232,6 +341,8 @@ export default function AppBuilderWorkspace({
   ]);
   const lastSchemaRef = useRef<UIComponent | null>(null);
   const isEditingExistingProject = Boolean(routeProjectId);
+  const showQuickStartScenes =
+    !isEditingExistingProject && !uiSchema && messages.length <= 1 && !isGenerating;
 
   useEffect(() => {
     if (!schema || schema === lastSchemaRef.current) {
@@ -260,6 +371,17 @@ export default function AppBuilderWorkspace({
       sendPrompt(prompt, uiSchema);
     },
     [sendPrompt, uiSchema],
+  );
+
+  const handleLaunchScene = useCallback(
+    (scene: StudioPromptScene) => {
+      if (isGenerating) {
+        return;
+      }
+
+      handleSend(scene.prompt);
+    },
+    [handleSend, isGenerating],
   );
 
   const requestExportedCode = useCallback(async () => {
@@ -526,6 +648,12 @@ export default function AppBuilderWorkspace({
                 </div>
 
                 <div className="relative flex min-h-0 flex-1 flex-col">
+                  {showQuickStartScenes ? (
+                    <WorkspaceQuickStartRail
+                      disabled={isGenerating}
+                      onLaunch={handleLaunchScene}
+                    />
+                  ) : null}
                   <ChatMessages messages={messages} isLoading={isGenerating} />
                   <ChatInput
                     onSend={handleSend}
@@ -584,6 +712,28 @@ export default function AppBuilderWorkspace({
             </div>
 
             <div className="relative flex min-h-0 flex-1 flex-col">
+              {showQuickStartScenes ? (
+                <div className="px-4 pt-4">
+                  <div className="rounded-[1.6rem] border border-border/80 bg-background/55 p-4 backdrop-blur-xl">
+                    <div className="flex items-center gap-2 text-primary">
+                      <Sparkles className="h-4 w-4" />
+                      <span className="text-[11px] font-bold uppercase tracking-[0.2em]">
+                        Scene ignition
+                      </span>
+                    </div>
+                    <div className="mt-4 space-y-3">
+                      {STUDIO_PROMPT_SCENES.map((scene) => (
+                        <WorkspaceQuickStartCard
+                          key={scene.id}
+                          scene={scene}
+                          disabled={isGenerating}
+                          onLaunch={handleLaunchScene}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
               <ChatMessages messages={messages} isLoading={isGenerating} />
               <ChatInput
                 onSend={handleSend}

@@ -1,6 +1,8 @@
 import { build as esbuild } from "esbuild";
 import { build as viteBuild } from "vite";
 import { rm, readFile } from "fs/promises";
+import { loadLocalEnv } from "../server/load-env.ts";
+import { assertNoSensitiveViteEnv } from "../server/security/public-env.ts";
 
 // server deps to bundle to reduce openat(2) syscalls
 // which helps cold start times
@@ -33,6 +35,9 @@ const allowlist = [
 ];
 
 async function buildAll() {
+  loadLocalEnv();
+  assertNoSensitiveViteEnv();
+
   await rm("dist", { recursive: true, force: true });
 
   console.log("building client...");
