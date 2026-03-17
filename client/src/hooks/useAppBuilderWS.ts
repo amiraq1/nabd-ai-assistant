@@ -151,7 +151,7 @@ export function useAppBuilderWS() {
     };
   }, [flushQueuedMessages]);
 
-  const sendPrompt = useCallback((text: string) => {
+  const sendPrompt = useCallback((text: string, currentSchema?: UIComponent | null) => {
     const prompt = text.trim();
     if (!prompt) {
       return;
@@ -161,6 +161,7 @@ export function useAppBuilderWS() {
       type: "BUILD_UI_REQUEST",
       payload: {
         prompt,
+        currentSchema: currentSchema ?? undefined,
       },
     });
 

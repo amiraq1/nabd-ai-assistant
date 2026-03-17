@@ -42,7 +42,7 @@ const widgetRenderers: Record<KnownWidgetType, WidgetRenderFn> = {
   Image: (schema) => (
     <img
       src={schema.src}
-      alt={schema.text ?? "Generated UI asset"}
+      alt={schema.text ?? "أصل مرئي موَلّد آليّاً"}
       className={schema.style}
     />
   ),

@@ -102,17 +102,31 @@ function formatToolRuns(toolRuns: ToolRunTrace[]): string {
 
 function formatRetrievedContext(contexts: RetrievedContext[]): string {
   return contexts
-    .map(
-      (context, index) =>
-        `${index + 1}. [${context.title}] (${context.source})\n${context.content}`,
-    )
+    .map((context, index) => {
+      const chunkLabel =
+        context.chunkStart === context.chunkEnd
+          ? `chunk ${context.chunkStart + 1}`
+          : `chunks ${context.chunkStart + 1}-${context.chunkEnd + 1}`;
+      const matchedTerms =
+        context.matchedTerms.length > 0
+          ? `matchedTerms: ${context.matchedTerms.join(", ")}`
+          : "matchedTerms: none";
+
+      return (
+        `${index + 1}. [${context.title}] (${context.source})\n` +
+        `relevance=${context.score.toFixed(3)} | ${chunkLabel}\n` +
+        `${matchedTerms}\n` +
+        `${context.content}`
+      );
+    })
     .join("\n\n");
 }
 
 function buildCitations(contexts: RetrievedContext[]): string {
   if (contexts.length === 0) return "";
   const lines = contexts.map(
-    (context, index) => `${index + 1}. ${context.title} (${context.source})`,
+    (context, index) =>
+      `${index + 1}. ${context.title} (${context.source}, chunks ${context.chunkStart + 1}-${context.chunkEnd + 1})`,
   );
   return `\n\nالمراجع:\n${lines.join("\n")}`;
 }

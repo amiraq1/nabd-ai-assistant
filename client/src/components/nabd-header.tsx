@@ -49,7 +49,7 @@ export function NabdHeader({
               data-testid="button-disconnect-phone"
             >
               <PlugZap className="h-4 w-4" />
-              <span>Disconnect Phone</span>
+              <span>فصل الهاتف الارتباطي</span>
             </Button>
           )}
           <Button

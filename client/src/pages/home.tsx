@@ -33,8 +33,8 @@ const DIRECT_CONVERSATION_ID = "direct-phone";
 const DIRECT_PHONE_PROFILE: PromptProfileOption[] = [
   {
     id: "direct_phone",
-    label: "tinyllama",
-    description: "اتصال مباشر بهاتفك",
+    label: "tinyllama (محلي)",
+    description: "اتصال مباشر بهاتفك بخصوصية تامة",
   },
 ];
 
@@ -89,12 +89,12 @@ const LivePreviewCanvas = memo(({ schema }: { schema: UIComponent | null }) => (
     <div className="flex items-center justify-between border-b border-border/70 px-4 py-3 md:px-6">
       <div className="flex items-center gap-2.5">
         <div className="h-2 w-2 rounded-full bg-primary shadow-[0_0_0_4px_hsl(var(--primary)/0.16)]" />
-        <h2 className="text-sm font-semibold tracking-[0.11em] text-foreground/75 uppercase">
-          Live Preview Canvas
+        <h2 className="text-sm font-semibold tracking-wide text-foreground/80 uppercase">
+          مساحة الاستعراض الحية
         </h2>
       </div>
       <span className="rounded-full border border-border/80 bg-background/45 px-2.5 py-1 text-[11px] font-semibold text-foreground/50">
-        Responsive
+        متجاوب (Responsive)
       </span>
     </div>
 
@@ -121,9 +121,9 @@ const LivePreviewCanvas = memo(({ schema }: { schema: UIComponent | null }) => (
                 <div className="rounded-2xl border border-primary/25 bg-primary/12 p-3 text-primary">
                   <Smartphone className="h-6 w-6" />
                 </div>
-                <p className="text-sm font-semibold text-foreground/80">Generated app preview appears here</p>
+                <p className="text-sm font-semibold text-foreground/80">ستظهر المعاينة الحية للتطبيق هنا</p>
                 <p className="max-w-[220px] text-xs leading-6 text-foreground/50">
-                  Your AI-generated screens will render in this canvas in real time.
+                  شاشاتك المونَّدة بالذكاء الاصطناعي ستُرسم في هذه المساحة فورياً.
                 </p>
               </div>
             )}

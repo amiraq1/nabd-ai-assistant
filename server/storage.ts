@@ -9,16 +9,10 @@ import {
   type InsertProject,
   type ProjectScreen,
   type InsertProjectScreen,
-  users,
-  conversations,
-  messages,
-  projects,
-  projectScreens,
 } from "../shared/schema.js";
-import { db } from "./db.js";
 import { hasDatabaseUrl } from "./database-url.js";
-import { eq, desc, and } from "drizzle-orm";
 import { randomUUID } from "crypto";
+import { dataAccess } from "./dal/index.js";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -31,12 +25,24 @@ export interface IStorage {
   deleteConversation(id: string, userId: string): Promise<boolean>;
   getMessages(conversationId: string, userId: string): Promise<Message[]>;
   createMessage(msg: InsertMessage): Promise<Message>;
+  getProjects(): Promise<Project[]>;
+  getProject(id: string): Promise<Project | undefined>;
   getProjectByName(userId: string, name: string): Promise<Project | undefined>;
   createProject(project: InsertProject): Promise<Project>;
+  deleteProject(id: string): Promise<boolean>;
+  updateProjectName(id: string, name: string): Promise<Project | undefined>;
   ensureProject(userId: string, name: string, platform: Project["platform"]): Promise<Project>;
   createProjectScreen(screen: InsertProjectScreen): Promise<ProjectScreen>;
   getProjectScreen(screenId: string): Promise<ProjectScreen | undefined>;
   getLatestProjectScreen(projectId: string): Promise<ProjectScreen | undefined>;
+  updateProjectScreen(
+    screenId: string,
+    updates: {
+      name?: string;
+      uiSchema?: InsertProjectScreen["uiSchema"];
+      reactCode?: string;
+    },
+  ): Promise<ProjectScreen | undefined>;
   updateProjectScreenReactCode(
     screenId: string,
     reactCode: string,
@@ -45,113 +51,70 @@ export interface IStorage {
 
 export class DatabaseStorage implements IStorage {
   async getUser(id: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
-    return user;
+    return dataAccess.repositories.users.findById(id);
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.username, username));
-    return user;
+    return dataAccess.repositories.users.findByUsername(username);
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const [user] = await db.insert(users).values(insertUser).returning();
-    return user;
+    return dataAccess.repositories.users.create(insertUser);
   }
 
   async ensureSessionUser(userId: string): Promise<User> {
-    const existing = await this.getUser(userId);
-    if (existing) {
-      return existing;
-    }
-
-    const username = `session_${userId}`;
-    const password = randomUUID();
-
-    const [created] = await db
-      .insert(users)
-      .values({
-        id: userId,
-        username,
-        password,
-      })
-      .onConflictDoNothing()
-      .returning();
-
-    if (created) {
-      return created;
-    }
-
-    const fallback = await this.getUser(userId);
-    if (fallback) {
-      return fallback;
-    }
-
-    throw new Error("Failed to ensure a backing user row for the active session.");
+    return dataAccess.repositories.users.ensureSessionUser(userId);
   }
 
   async getConversations(userId: string): Promise<Conversation[]> {
-    return db
-      .select()
-      .from(conversations)
-      .where(eq(conversations.userId, userId))
-      .orderBy(desc(conversations.createdAt));
+    const page = await dataAccess.conversations.listConversationsForUser(userId, {
+      limit: 100,
+    });
+    return page.items;
   }
 
   async getConversation(id: string, userId: string): Promise<Conversation | undefined> {
-    const [conv] = await db
-      .select()
-      .from(conversations)
-      .where(and(eq(conversations.id, id), eq(conversations.userId, userId)));
-    return conv;
+    return dataAccess.conversations.getConversationForUser(id, userId);
   }
 
   async createConversation(conv: InsertConversation): Promise<Conversation> {
-    const [result] = await db.insert(conversations).values(conv).returning();
-    return result;
+    return dataAccess.conversations.createConversation(conv.userId, conv.title);
   }
 
   async deleteConversation(id: string, userId: string): Promise<boolean> {
-    const [deletedConversation] = await db
-      .delete(conversations)
-      .where(and(eq(conversations.id, id), eq(conversations.userId, userId)))
-      .returning({ id: conversations.id });
-    return Boolean(deletedConversation);
+    return dataAccess.conversations.deleteConversation(id, userId);
   }
 
   async getMessages(conversationId: string, userId: string): Promise<Message[]> {
-    const [conv] = await db
-      .select({ id: conversations.id })
-      .from(conversations)
-      .where(
-        and(eq(conversations.id, conversationId), eq(conversations.userId, userId)),
-      );
-    if (!conv) return [];
-
-    return db
-      .select()
-      .from(messages)
-      .where(eq(messages.conversationId, conversationId))
-      .orderBy(messages.createdAt);
+    return dataAccess.conversations.listMessagesForConversation(conversationId, userId);
   }
 
   async createMessage(msg: InsertMessage): Promise<Message> {
-    const [result] = await db.insert(messages).values(msg).returning();
-    return result;
+    return dataAccess.conversations.createMessage(msg);
+  }
+
+  async getProjects(): Promise<Project[]> {
+    return dataAccess.repositories.projects.listAll(200);
+  }
+
+  async getProject(id: string): Promise<Project | undefined> {
+    return dataAccess.repositories.projects.findById(id);
   }
 
   async getProjectByName(userId: string, name: string): Promise<Project | undefined> {
-    const [project] = await db
-      .select()
-      .from(projects)
-      .where(and(eq(projects.userId, userId), eq(projects.name, name)))
-      .orderBy(desc(projects.createdAt));
-    return project;
+    return dataAccess.repositories.projects.findByNameForUser(userId, name);
   }
 
   async createProject(project: InsertProject): Promise<Project> {
-    const [result] = await db.insert(projects).values(project).returning();
-    return result;
+    return dataAccess.repositories.projects.create(project);
+  }
+
+  async deleteProject(id: string): Promise<boolean> {
+    return dataAccess.repositories.projects.deleteById(id);
+  }
+
+  async updateProjectName(id: string, name: string): Promise<Project | undefined> {
+    return dataAccess.repositories.projects.updateName(id, name);
   }
 
   async ensureProject(
@@ -159,49 +122,37 @@ export class DatabaseStorage implements IStorage {
     name: string,
     platform: Project["platform"],
   ): Promise<Project> {
-    const existing = await this.getProjectByName(userId, name);
-    if (existing) {
-      return existing;
-    }
-
-    return this.createProject({ userId, name, platform });
+    return dataAccess.projects.ensureNamedProject({ userId, name, platform });
   }
 
   async createProjectScreen(screen: InsertProjectScreen): Promise<ProjectScreen> {
-    const [result] = await db.insert(projectScreens).values(screen).returning();
-    return result;
+    return dataAccess.repositories.projects.createScreen(screen);
   }
 
   async getProjectScreen(screenId: string): Promise<ProjectScreen | undefined> {
-    const [screen] = await db
-      .select()
-      .from(projectScreens)
-      .where(eq(projectScreens.id, screenId));
-    return screen;
+    return dataAccess.repositories.projects.findScreenById(screenId);
   }
 
   async getLatestProjectScreen(projectId: string): Promise<ProjectScreen | undefined> {
-    const [screen] = await db
-      .select()
-      .from(projectScreens)
-      .where(eq(projectScreens.projectId, projectId))
-      .orderBy(desc(projectScreens.updatedAt));
-    return screen;
+    return dataAccess.repositories.projects.findLatestScreenByProject(projectId);
+  }
+
+  async updateProjectScreen(
+    screenId: string,
+    updates: {
+      name?: string;
+      uiSchema?: InsertProjectScreen["uiSchema"];
+      reactCode?: string;
+    },
+  ): Promise<ProjectScreen | undefined> {
+    return dataAccess.repositories.projects.updateScreen(screenId, updates);
   }
 
   async updateProjectScreenReactCode(
     screenId: string,
     reactCode: string,
   ): Promise<ProjectScreen | undefined> {
-    const [screen] = await db
-      .update(projectScreens)
-      .set({
-        reactCode,
-        updatedAt: new Date(),
-      })
-      .where(eq(projectScreens.id, screenId))
-      .returning();
-    return screen;
+    return this.updateProjectScreen(screenId, { reactCode });
   }
 }
 
@@ -302,6 +253,16 @@ export class MemStorage implements IStorage {
     return message;
   }
 
+  async getProjects(): Promise<Project[]> {
+    return Array.from(this.projects.values()).sort(
+      (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
+    );
+  }
+
+  async getProject(id: string): Promise<Project | undefined> {
+    return this.projects.get(id);
+  }
+
   async getProjectByName(userId: string, name: string): Promise<Project | undefined> {
     return Array.from(this.projects.values())
       .filter((project) => project.userId === userId && project.name === name)
@@ -317,6 +278,36 @@ export class MemStorage implements IStorage {
     };
     this.projects.set(id, createdProject);
     return createdProject;
+  }
+
+  async deleteProject(id: string): Promise<boolean> {
+    const project = this.projects.get(id);
+    if (!project) {
+      return false;
+    }
+
+    this.projects.delete(id);
+    for (const [screenId, screen] of Array.from(this.projectScreens.entries())) {
+      if (screen.projectId === id) {
+        this.projectScreens.delete(screenId);
+      }
+    }
+
+    return true;
+  }
+
+  async updateProjectName(id: string, name: string): Promise<Project | undefined> {
+    const project = this.projects.get(id);
+    if (!project) {
+      return undefined;
+    }
+
+    const updatedProject: Project = {
+      ...project,
+      name,
+    };
+    this.projects.set(id, updatedProject);
+    return updatedProject;
   }
 
   async ensureProject(
@@ -354,9 +345,13 @@ export class MemStorage implements IStorage {
       .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())[0];
   }
 
-  async updateProjectScreenReactCode(
+  async updateProjectScreen(
     screenId: string,
-    reactCode: string,
+    updates: {
+      name?: string;
+      uiSchema?: InsertProjectScreen["uiSchema"];
+      reactCode?: string;
+    },
   ): Promise<ProjectScreen | undefined> {
     const screen = this.projectScreens.get(screenId);
     if (!screen) {
@@ -365,11 +360,20 @@ export class MemStorage implements IStorage {
 
     const updatedScreen: ProjectScreen = {
       ...screen,
-      reactCode,
+      ...(updates.name !== undefined ? { name: updates.name } : {}),
+      ...(updates.uiSchema !== undefined ? { uiSchema: updates.uiSchema } : {}),
+      ...(updates.reactCode !== undefined ? { reactCode: updates.reactCode } : {}),
       updatedAt: new Date(),
     };
     this.projectScreens.set(screenId, updatedScreen);
     return updatedScreen;
+  }
+
+  async updateProjectScreenReactCode(
+    screenId: string,
+    reactCode: string,
+  ): Promise<ProjectScreen | undefined> {
+    return this.updateProjectScreen(screenId, { reactCode });
   }
 }
 

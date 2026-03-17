@@ -1,5 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Copy, Download, LoaderCircle, Save, Smartphone, Sparkles } from "lucide-react";
+import { useLocation } from "wouter";
 import { ChatInput, type PromptProfileOption } from "@/components/chat-input";
 import { ChatMessages } from "@/components/chat-messages";
 import { WidgetRenderer } from "@/components/WidgetRenderer";
@@ -15,6 +17,18 @@ import type { Message } from "@shared/schema";
 import type { UIComponent } from "@shared/ui-schema";
 
 const APP_BUILDER_CONVERSATION_ID = "app-builder";
+
+interface AppBuilderWorkspaceProps {
+  routeProjectId?: string;
+  initialProjectName?: string;
+  initialUiSchema?: UIComponent | null;
+}
+
+interface SavedProjectResponse {
+  id: string;
+  name: string;
+  createdAt: string;
+}
 
 function createLocalMessage(role: Message["role"], content: string): Message {
   return {
@@ -32,10 +46,33 @@ function createLocalMessage(role: Message["role"], content: string): Message {
 const BUILDER_PROFILE: PromptProfileOption[] = [
   {
     id: "app_builder",
-    label: "App Builder",
-    description: "Generate mobile UI schemas over WebSocket.",
+    label: "مهندس التطبيقات",
+    description: "توليد واجهات وهياكل النظام اللحظية.",
   },
 ];
+
+const WorkspaceStatus = memo(
+  ({
+    isEditingExistingProject,
+    projectName,
+  }: {
+    isEditingExistingProject: boolean;
+    projectName: string;
+  }) => (
+    <div className="mt-4 flex flex-wrap items-center gap-2">
+      <span className="rounded-full border border-border/80 bg-background/45 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-foreground/58">
+        {isEditingExistingProject ? "Editing saved app" : "New app draft"}
+      </span>
+      {projectName ? (
+        <span className="max-w-full truncate text-sm font-semibold text-foreground/76">
+          {projectName}
+        </span>
+      ) : null}
+    </div>
+  ),
+);
+
+WorkspaceStatus.displayName = "WorkspaceStatus";
 
 const MobileFrame = memo(
   ({
@@ -61,13 +98,13 @@ const MobileFrame = memo(
       <div className="flex items-center justify-between border-b border-border/70 px-4 py-3 md:px-6">
         <div className="flex items-center gap-2.5">
           <div className="h-2 w-2 rounded-full bg-primary shadow-[0_0_0_4px_hsl(var(--primary)/0.16)]" />
-          <h2 className="text-sm font-semibold uppercase tracking-[0.11em] text-foreground/75">
-            Live Preview
+          <h2 className="text-sm font-bold uppercase tracking-wider text-foreground/80">
+            العرض المباشر
           </h2>
         </div>
         <div className="flex items-center gap-2">
           <span className="rounded-full border border-border/80 bg-background/45 px-2.5 py-1 text-[11px] font-semibold text-foreground/50">
-            Mobile Canvas
+            جوال (Mobile)
           </span>
           <Button
             type="button"
@@ -81,7 +118,7 @@ const MobileFrame = memo(
             ) : (
               <Save className="h-3.5 w-3.5" />
             )}
-            Save Project
+            حفظ المشروع
           </Button>
           <Button
             type="button"
@@ -96,7 +133,7 @@ const MobileFrame = memo(
             ) : (
               <Copy className="h-3.5 w-3.5" />
             )}
-            Copy Code
+            نسخ الشيفرة
           </Button>
           <Button
             type="button"
@@ -111,7 +148,7 @@ const MobileFrame = memo(
             ) : (
               <Download className="h-3.5 w-3.5" />
             )}
-            Export
+            تصدير
           </Button>
         </div>
       </div>
@@ -141,11 +178,11 @@ const MobileFrame = memo(
                   <div className="rounded-2xl border border-primary/25 bg-primary/12 p-3 text-primary">
                     <Smartphone className="h-6 w-6" />
                   </div>
-                  <p className="text-sm font-semibold text-foreground/80">
-                    Your generated UI will render here
+                  <p className="text-sm font-bold text-foreground/80">
+                    مساحة الرسم المعمارية
                   </p>
-                  <p className="max-w-[220px] text-xs leading-6 text-foreground/50">
-                    Describe a screen, send the prompt, and iterate on the result in real time.
+                  <p className="max-w-[220px] text-xs leading-6 text-foreground/55">
+                    صِف واجهة التطبيق، أرسل التوجيه، وراقب البناء يتم بصورة فورية.
                   </p>
                 </div>
               )}
@@ -156,9 +193,9 @@ const MobileFrame = memo(
                     <LoaderCircle className="h-6 w-6 animate-spin" />
                   </div>
                   <div className="space-y-1 text-center">
-                    <p className="text-sm font-semibold text-foreground/85">Generating interface</p>
+                    <p className="text-sm font-bold tracking-wide text-foreground/85">جارٍ صياغة الواجهة...</p>
                     <p className="text-xs text-foreground/55">
-                      The mobile preview will refresh as soon as the schema arrives.
+                      سيتم تحديث العرض فور اكتمال الهيكل (Schema).
                     </p>
                   </div>
                 </div>
@@ -173,20 +210,28 @@ const MobileFrame = memo(
 
 MobileFrame.displayName = "MobileFrame";
 
-export default function AppBuilderWorkspace() {
+export default function AppBuilderWorkspace({
+  routeProjectId,
+  initialProjectName = "",
+  initialUiSchema = null,
+}: AppBuilderWorkspaceProps) {
   const { schema, screenId, isGenerating, sendPrompt } = useAppBuilderWS();
   const { toast } = useToast();
-  const [uiSchema, setUiSchema] = useState<UIComponent | null>(null);
+  const queryClient = useQueryClient();
+  const [, setLocation] = useLocation();
+  const [projectName, setProjectName] = useState(initialProjectName);
+  const [uiSchema, setUiSchema] = useState<UIComponent | null>(initialUiSchema);
   const [isSaving, setIsSaving] = useState(false);
   const [isCopying, setIsCopying] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [messages, setMessages] = useState<Message[]>(() => [
     createLocalMessage(
       "assistant",
-      "Describe the app or screen you want. I will generate a UI schema and update the mobile preview.",
+      "صِف التطبيق أو الواجهة التي تطمح لبنائها. سأقوم بتوليد هيكل واجهة المستخدم وتحديث العرض الفوري لك.",
     ),
   ]);
   const lastSchemaRef = useRef<UIComponent | null>(null);
+  const isEditingExistingProject = Boolean(routeProjectId);
 
   useEffect(() => {
     if (!schema || schema === lastSchemaRef.current) {
@@ -199,7 +244,7 @@ export default function AppBuilderWorkspace() {
       ...current,
       createLocalMessage(
         "assistant",
-        "Preview updated. Send another prompt to refine the layout, styling, or component structure.",
+        "تم تحديث العرض. أرسل توجيهات إضافية لتنقيح التخطيط، تنسيق الألوان، والتفاصيل البصرية للمكونات.",
       ),
     ]);
   }, [schema]);
@@ -212,14 +257,14 @@ export default function AppBuilderWorkspace() {
       }
 
       setMessages((current) => [...current, createLocalMessage("user", prompt)]);
-      sendPrompt(prompt);
+      sendPrompt(prompt, uiSchema);
     },
-    [sendPrompt],
+    [sendPrompt, uiSchema],
   );
 
   const requestExportedCode = useCallback(async () => {
     if (!uiSchema) {
-      throw new Error("Generate a screen before exporting code.");
+      throw new Error("يجب توليد واجهة قبل محاولة تصدير الشيفرة.");
     }
 
     const response = await fetch("/api/export", {
@@ -235,7 +280,7 @@ export default function AppBuilderWorkspace() {
 
     if (!response.ok) {
       const contentType = response.headers.get("content-type") ?? "";
-      let message = "Failed to export generated React code.";
+      let message = "فشل في تصدير شيفرة React الموّلدة.";
 
       if (contentType.includes("application/json")) {
         const payload = (await response.json()) as { message?: string };
@@ -273,7 +318,7 @@ export default function AppBuilderWorkspace() {
     textarea.remove();
 
     if (!copied) {
-      throw new Error("Clipboard access is unavailable in this browser.");
+      throw new Error("تعذر الوصول للحافظة في هذا المتصفح.");
     }
   }, []);
 
@@ -289,15 +334,15 @@ export default function AppBuilderWorkspace() {
       await copyToClipboard(code);
 
       toast({
-        title: "Code copied",
-        description: "Generated React code copied to the clipboard.",
+        title: "اكتمل النسخ",
+        description: "تم نسخ شيفرة React بنجاح إلى الحافظة.",
       });
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Failed to copy generated React code.";
+        error instanceof Error ? error.message : "فشل في نسخ شيفرة React الموّلدة.";
       toast({
         variant: "destructive",
-        title: "Copy failed",
+        title: "فشل النسخ",
         description: message,
       });
     } finally {
@@ -334,15 +379,15 @@ export default function AppBuilderWorkspace() {
       window.URL.revokeObjectURL(objectUrl);
 
       toast({
-        title: "Export complete",
-        description: "GeneratedApp.tsx downloaded successfully.",
+        title: "اكتمل التصدير",
+        description: "تم تحميل ملف GeneratedApp.tsx بنجاح.",
       });
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Failed to export generated React code.";
+        error instanceof Error ? error.message : "فشل في تصدير شيفرة React الموّلدة.";
       toast({
         variant: "destructive",
-        title: "Export failed",
+        title: "فشل التصدير",
         description: message,
       });
     } finally {
@@ -355,49 +400,87 @@ export default function AppBuilderWorkspace() {
       return;
     }
 
-    const requestedName = window.prompt("Project name");
-    const projectName = requestedName?.trim();
+    const requestedName = window.prompt("اسم لتسمية هذا المشروع الابتكاري:");
+    const nextProjectName = requestedName?.trim();
+    const projectName = nextProjectName;
 
-    if (!projectName) {
+    if (!nextProjectName) {
       return;
     }
 
     setIsSaving(true);
 
     try {
-      const response = await fetch("/api/projects", {
-        method: "POST",
+      const isUpdatingExistingProject = Boolean(routeProjectId);
+      const projectEndpoint = isUpdatingExistingProject
+        ? `/api/projects/${routeProjectId}`
+        : "/api/projects";
+      const response = await fetch(projectEndpoint, {
+        method: isUpdatingExistingProject ? "PUT" : "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          name: projectName,
+          name: nextProjectName,
           uiSchema,
         }),
       });
 
       if (!response.ok) {
         const payload = (await response.json().catch(() => null)) as { message?: string } | null;
-        throw new Error(payload?.message || "Failed to save project.");
+        throw new Error(payload?.message || "فشل النظام في حفظ المشروع.");
       }
 
-      await response.json();
+      const savedProject = (await response.json()) as SavedProjectResponse;
+      queryClient.setQueryData<SavedProjectResponse[]>(["/api/projects"], (current = []) => {
+        const nextProjects = current.filter((project) => project.id !== savedProject.id);
+        return [
+          {
+            id: savedProject.id,
+            name: savedProject.name,
+            createdAt: savedProject.createdAt,
+          },
+          ...nextProjects,
+        ];
+      });
+      queryClient.setQueryData(["/api/projects", savedProject.id], {
+        id: savedProject.id,
+        name: savedProject.name,
+        createdAt: savedProject.createdAt,
+        uiSchema,
+      });
+      void queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
+      setProjectName(savedProject.name);
+
+      if (!isUpdatingExistingProject) {
+        setLocation(`/workspace/${savedProject.id}`);
+      }
 
       toast({
-        title: "Project saved successfully!",
-        description: `"${projectName}" is now stored in your projects.`,
+        title: "تم توثيق المشروع بنجاح!",
+        description: `أصبح "${projectName}" جزءاً من أرشيف ابتكاراتك.`,
       });
     } catch (error) {
       toast({
         variant: "destructive",
-        title: "Save failed",
+        title: "تعذر الحفظ",
         description:
-          error instanceof Error ? error.message : "Failed to save project.",
+          error instanceof Error ? error.message : "فشل النظام في حفظ المشروع.",
       });
     } finally {
       setIsSaving(false);
     }
-  }, [isCopying, isExporting, isGenerating, isSaving, toast, uiSchema]);
+  }, [
+    isCopying,
+    isExporting,
+    isGenerating,
+    isSaving,
+    queryClient,
+    routeProjectId,
+    setLocation,
+    toast,
+    uiSchema,
+  ]);
 
   const promptProfiles = useMemo(() => BUILDER_PROFILE, []);
 
@@ -426,16 +509,20 @@ export default function AppBuilderWorkspace() {
                 <div className="border-b border-border/70 px-5 py-4">
                   <div className="flex items-center gap-2 text-primary">
                     <Sparkles className="h-4 w-4" />
-                    <span className="text-xs font-semibold uppercase tracking-[0.24em]">
-                      AI App Builder
+                    <span className="text-xs font-bold uppercase tracking-widest">
+                      هندسة التطبيقات عبر الذكاء
                     </span>
                   </div>
-                  <h1 className="mt-3 text-2xl font-semibold tracking-tight text-foreground">
-                    Prompt-to-UI workspace
+                  <h1 className="mt-3 text-2xl font-black tracking-tight text-foreground">
+                    مختبر التصميم (Prompt-to-UI)
                   </h1>
-                  <p className="mt-2 max-w-sm text-sm leading-6 text-foreground/55">
-                    Use the chat to generate structured screens over WebSocket and inspect the result in the live canvas.
+                  <p className="mt-2 max-w-sm text-sm leading-relaxed text-foreground/60 font-medium">
+                    استخدم المحادثة لتوليد شاشات معمارية وتفحص النتيجة في المعاينة الحية.
                   </p>
+                  <WorkspaceStatus
+                    isEditingExistingProject={isEditingExistingProject}
+                    projectName={projectName}
+                  />
                 </div>
 
                 <div className="relative flex min-h-0 flex-1 flex-col">
@@ -486,10 +573,14 @@ export default function AppBuilderWorkspace() {
             <div className="border-b border-border/70 px-4 py-3">
               <div className="flex items-center gap-2 text-primary">
                 <Sparkles className="h-4 w-4" />
-                <span className="text-xs font-semibold uppercase tracking-[0.22em]">
-                  AI App Builder
+                <span className="text-xs font-bold uppercase tracking-widest">
+                  هندسة التطبيقات عبر الذكاء
                 </span>
               </div>
+              <WorkspaceStatus
+                isEditingExistingProject={isEditingExistingProject}
+                projectName={projectName}
+              />
             </div>
 
             <div className="relative flex min-h-0 flex-1 flex-col">

@@ -1,11 +1,17 @@
 import type { Express, RequestHandler } from "express";
 import type { Server } from "http";
 import { storage } from "./storage.js";
+import { dataAccess } from "./dal/index.js";
 import {
   generateAssistantReply,
   previewOrchestration,
 } from "./ai/orchestrator.js";
 import { generateUISchema } from "./ai/ui-schema.js";
+import {
+  generateAppBundle,
+  generateBlueprintOnly,
+  materializeGeneratedApp,
+} from "./services/app-generation-engine.js";
 import {
   getPromptProfileById,
   listPromptProfiles,
@@ -33,6 +39,8 @@ import {
   type UIComponent,
 } from "../shared/ui-schema.js";
 import { generateReactCode } from "./utils/generate-react-code.js";
+import { registerFileExplorerRoutes } from "./routes/files.js";
+import { registerLibraryRoutes } from "./routes/library.js";
 import { registerProjectRoutes } from "./routes/projects.js";
 
 const MAX_CONVERSATION_TITLE_CHARS = 120;
@@ -110,6 +118,8 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  registerFileExplorerRoutes(app);
+  registerLibraryRoutes(app);
   registerProjectRoutes(app);
 
   const isProduction = process.env.NODE_ENV === "production";
@@ -203,13 +213,36 @@ export async function registerRoutes(
         title: string;
         source: string;
         content: string;
+        metadata?: Record<string, string | number | boolean | string[]>;
       };
 
       const isIngestDocument = (value: IngestDocument | null): value is IngestDocument =>
         value !== null;
 
+      const normalizeMetadata = (
+        value: unknown,
+      ): Record<string, string | number | boolean | string[]> | undefined => {
+        if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+
+        const metadata = Object.entries(value).reduce<
+          Record<string, string | number | boolean | string[]>
+        >((accumulator, [key, item]) => {
+          if (
+            typeof item === "string" ||
+            typeof item === "number" ||
+            typeof item === "boolean" ||
+            (Array.isArray(item) && item.every((entry) => typeof entry === "string"))
+          ) {
+            accumulator[key] = item;
+          }
+          return accumulator;
+        }, {});
+
+        return Object.keys(metadata).length > 0 ? metadata : undefined;
+      };
+
       const prepared = docs
-        .map((doc: unknown, index: number) => {
+        .map((doc: unknown, index: number): IngestDocument | null => {
           if (!doc || typeof doc !== "object") return null;
           const value = doc as Record<string, unknown>;
           const title = typeof value.title === "string" ? value.title.trim() : "";
@@ -217,6 +250,7 @@ export async function registerRoutes(
           const content = typeof value.content === "string" ? value.content.trim() : "";
 
           if (!title || !source || !content) return null;
+          const metadata = normalizeMetadata(value.metadata);
           return {
             id:
               typeof value.id === "string" && value.id.trim()
@@ -225,6 +259,7 @@ export async function registerRoutes(
             title,
             source,
             content,
+            ...(metadata ? { metadata } : {}),
           };
         })
         .filter(isIngestDocument);
@@ -282,6 +317,63 @@ export async function registerRoutes(
       count: listPromptProfiles().length,
       items: listPromptProfiles(),
     });
+  });
+
+  app.post("/api/ai/engine/blueprint", async (req, res) => {
+    const prompt = typeof req.body?.prompt === "string" ? req.body.prompt.trim() : "";
+    const currentBlueprint = req.body?.currentBlueprint;
+    if (!prompt) {
+      return res.status(400).json({ message: "prompt is required" });
+    }
+
+    try {
+      const blueprint = await generateBlueprintOnly(prompt, currentBlueprint);
+      return res.json({ blueprint });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to generate blueprint";
+      return res.status(500).json({ message });
+    }
+  });
+
+  app.post("/api/ai/engine/generate", async (req, res) => {
+    const prompt = typeof req.body?.prompt === "string" ? req.body.prompt.trim() : "";
+    const currentBlueprint = req.body?.currentBlueprint;
+    if (!prompt) {
+      return res.status(400).json({ message: "prompt is required" });
+    }
+
+    try {
+      const bundle = await generateAppBundle(prompt, currentBlueprint);
+      return res.json(bundle);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to generate app bundle";
+      return res.status(500).json({ message });
+    }
+  });
+
+  app.post("/api/ai/engine/materialize", async (req, res) => {
+    try {
+      const bundleInput =
+        req.body?.bundle ??
+        (typeof req.body?.prompt === "string" && req.body.prompt.trim()
+          ? await generateAppBundle(req.body.prompt.trim(), req.body?.currentBlueprint)
+          : null);
+
+      if (!bundleInput) {
+        return res.status(400).json({
+          message: "Provide bundle or prompt to materialize generated files.",
+        });
+      }
+
+      const result = await materializeGeneratedApp(bundleInput);
+      return res.status(201).json(result);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to materialize app files";
+      return res.status(500).json({ message });
+    }
   });
 
   app.post("/api/direct-phone/generate", async (req, res) => {
@@ -382,8 +474,29 @@ export async function registerRoutes(
 
   app.get("/api/conversations", async (_req, res) => {
     const userId = resolveSessionUserId(_req, res);
-    const convs = await storage.getConversations(userId);
-    res.json(convs);
+    const rawLimit =
+      typeof _req.query.limit === "string" ? Number.parseInt(_req.query.limit, 10) : undefined;
+    const cursor =
+      typeof _req.query.cursor === "string" ? _req.query.cursor.trim() : undefined;
+    const query =
+      typeof _req.query.query === "string" ? _req.query.query.trim() : undefined;
+    const page = await dataAccess.conversations.listConversationsForUser(userId, {
+      limit: rawLimit,
+      cursor,
+      query,
+    });
+
+    if (rawLimit !== undefined || Boolean(cursor) || Boolean(query)) {
+      return res.json({
+        items: page.items,
+        pageInfo: page.pageInfo,
+        filters: {
+          query: query ?? null,
+        },
+      });
+    }
+
+    return res.json(page.items);
   });
 
   app.post("/api/conversations", async (req, res) => {
@@ -403,13 +516,13 @@ export async function registerRoutes(
       });
     }
 
-    const conv = await storage.createConversation({ title: normalizedTitle, userId });
+    const conv = await dataAccess.conversations.createConversation(userId, normalizedTitle);
     res.json(conv);
   });
 
   app.delete("/api/conversations/:id", async (req, res) => {
     const userId = resolveSessionUserId(req, res);
-    const deleted = await storage.deleteConversation(req.params.id, userId);
+    const deleted = await dataAccess.conversations.deleteConversation(req.params.id, userId);
     if (!deleted) {
       return res.status(404).json({ message: "المحادثة غير موجودة" });
     }
@@ -418,30 +531,44 @@ export async function registerRoutes(
 
   app.get("/api/conversations/:id/messages", async (req, res) => {
     const userId = resolveSessionUserId(req, res);
-    const conversation = await storage.getConversation(req.params.id, userId);
+    const conversation = await dataAccess.conversations.getConversationForUser(
+      req.params.id,
+      userId,
+    );
     if (!conversation) {
       return res.status(404).json({ message: "المحادثة غير موجودة" });
     }
 
-    const msgs = await storage.getMessages(req.params.id, userId);
+    const msgs = await dataAccess.conversations.listMessagesForConversation(
+      req.params.id,
+      userId,
+    );
     res.json(msgs);
   });
 
   app.get("/api/conversations/:id/preview", async (req, res) => {
     const userId = resolveSessionUserId(req, res);
-    const conversation = await storage.getConversation(req.params.id, userId);
+    const conversation = await dataAccess.conversations.getConversationForUser(
+      req.params.id,
+      userId,
+    );
     if (!conversation) {
       return res.status(404).json({ message: "ط§ظ„ظ…ط­ط§ط¯ط«ط© ط؛ظٹط± ظ…ظˆط¬ظˆط¯ط©" });
     }
 
     try {
       const projectName = buildConversationProjectName(conversation.id, conversation.title);
-      const project = await storage.getProjectByName(userId, projectName);
+      const project = await dataAccess.repositories.projects.findByNameForUser(
+        userId,
+        projectName,
+      );
       if (!project) {
         return res.json(null);
       }
 
-      const latestScreen = await storage.getLatestProjectScreen(project.id);
+      const latestScreen = await dataAccess.repositories.projects.findLatestScreenByProject(
+        project.id,
+      );
       if (!latestScreen) {
         return res.json(null);
       }
