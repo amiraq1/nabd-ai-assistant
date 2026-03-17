@@ -1,0 +1,43 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "BuildAHabitTracker API",
+    "version": "1.0.0",
+    "description": "Build a habit tracker app with CRUD API, streak metrics, and a responsive dashboard."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:5000"
+    }
+  ],
+  "paths": {
+    "/api/habits": {
+      "post": {
+        "summary": "Create a new habit record.",
+        "operationId": "createHabit",
+        "tags": [
+          "Habit"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        }
+      }
+    },
+    "/api/habits/{id}": {
+      "delete": {
+        "summary": "Delete a habit record.",
+        "operationId": "deleteHabit",
+        "tags": [
+          "Habit"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        }
+      }
+    }
+  }
+}
